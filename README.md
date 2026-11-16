@@ -14,6 +14,9 @@ App Android **no oficial y de código abierto** para gestionar tus conexiones de
 - **Resumen del último año**: total facturado, kWh, impuestos y tasas, alumbrado público e intereses, por conexión y en total.
 - **Detalle por factura**: cada concepto del PDF agrupado por rubro.
 - **Historial**: gráfico interactivo de consumo o importe, con escala y promedio.
+- **Desglose tocando cada cuadro**: por concepto y por factura.
+- **Aviso sonoro de vencimiento**: el día anterior y el día del vencimiento.
+- **Actualización automática**: relee los PDF en segundo plano y avisa de nuevas versiones publicadas en GitHub.
 - **Navegación rápida**: botón Inicio en todas las pantallas y selector para pasar de una conexión a otra.
 - **Mis facturas**: archivo de PDF por conexión, sin duplicados, disponible sin conexión y copiado en `Descargas/EPEN`.
 - **Facturas anteriores asistidas**: elegís el comprobante de referencia de una lista en lugar de buscarlo en papel.
@@ -48,6 +51,7 @@ Cada push a `main` compila y prueba con GitHub Actions. Al publicar una etiqueta
 | `PortalActivity.kt` | Portal del EPEN en WebView, autocompletado, descarga individual y en lote |
 | `Suministros.kt` | Registro persistente de conexiones y comprobantes |
 | `Lector.kt` | Lectura de facturas (PDF) y de páginas de resultados |
+| `Avisos.kt` | Avisos de vencimiento, revisión en segundo plano y nuevas versiones |
 | `Descargas.kt` | Descarga, deduplicación por SHA-256 y archivo de PDF |
 | `ArchivoActivity.kt` | Mis facturas |
 

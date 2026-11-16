@@ -69,16 +69,32 @@ class MainActivity : AppCompatActivity() {
             ).apply { setMargins(dp(16), dp(16), dp(16), dp(20)) })
         })
 
-        // Una vez por versión: vuelve a leer los PDF guardados (para sumar el detalle de
-        // impuestos, alumbrado e intereses) y une facturas que quedaron repetidas.
-        val prefs = getSharedPreferences("epen", Context.MODE_PRIVATE)
-        if (savedInstanceState == null && prefs.getInt("registro_version", 0) < 3) {
-            leyendo = true
-            thread {
-                Descargas.actualizarRegistro(this)
-                prefs.edit().putInt("registro_version", 3).apply()
-                runOnUiThread { leyendo = false; dibujar() }
-            }
+        Avisos.programar(this)
+        pedirPermisoAvisos()
+        if (savedInstanceState == null) actualizarEnSegundoPlano()
+    }
+
+    private val permisoAvisos = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    /** En Android 13+ los avisos necesitan permiso; se pide una sola vez. */
+    private fun pedirPermisoAvisos() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return
+        val p = getSharedPreferences("epen", Context.MODE_PRIVATE)
+        if (p.getBoolean("permiso_avisos_pedido", false)) return
+        p.edit().putBoolean("permiso_avisos_pedido", true).apply()
+        permisoAvisos.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    /** Cada vez que se abre: relee PDF nuevos o todos si cambió el lector, y busca versión nueva. */
+    private fun actualizarEnSegundoPlano() {
+        leyendo = true
+        thread {
+            val cambio = runCatching { Registro.actualizarSiHaceFalta(this) }.getOrDefault(false)
+            runCatching { Avisos.revisarVencimientos(this) }
+            if (System.currentTimeMillis() - Avisos.ultimaRevisionVersion(this) > 6 * 3600_000L)
+                Avisos.guardarVersion(this, Avisos.versionNueva(this))
+            runOnUiThread { leyendo = false; if (!isFinishing) dibujar() }
+            if (cambio) runOnUiThread { Toast.makeText(this, "Facturas actualizadas", Toast.LENGTH_SHORT).show() }
         }
     }
 
@@ -87,6 +103,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menu.add(0, 1, 0, "Mis facturas").setIcon(R.drawable.ic_doc).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
         menu.add(0, 5, 1, "Volver a leer mis facturas")
+        menu.add(0, 6, 1, "Avisos de vencimiento").setCheckable(true).setChecked(Avisos.activos(this))
         menu.add(0, 2, 2, "Guardar respaldo de conexiones")
         menu.add(0, 3, 3, "Restaurar respaldo")
         menu.add(0, 4, 4, "Acerca de")
@@ -102,8 +119,23 @@ class MainActivity : AppCompatActivity() {
                 leyendo = true; dibujar()
                 thread {
                     val n = Descargas.actualizarRegistro(this)
+                    getSharedPreferences("epen", Context.MODE_PRIVATE).edit().putInt("registro_version", Registro.VERSION_LECTOR).apply()
                     runOnUiThread { leyendo = false; dibujar(); Toast.makeText(this, "$n factura(s) leídas", Toast.LENGTH_SHORT).show() }
                 }
+            }
+            6 -> {
+                val nuevo = !Avisos.activos(this)
+                Avisos.activar(this, nuevo)
+                item.isChecked = nuevo
+                if (nuevo && !Avisos.puedeNotificar(this)) MaterialAlertDialogBuilder(this)
+                    .setTitle("Permitir notificaciones")
+                    .setMessage("Para recibir el aviso con sonido el día del vencimiento, permití las notificaciones de EPEN al día.")
+                    .setPositiveButton("Abrir ajustes") { _, _ ->
+                        startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
+                    }
+                    .setNegativeButton("Ahora no", null).show()
+                else Toast.makeText(this, if (nuevo) "Avisos activados: el día anterior y el día del vencimiento" else "Avisos desactivados", Toast.LENGTH_LONG).show()
             }
             4 -> MaterialAlertDialogBuilder(this)
                 .setTitle("EPEN al día")
@@ -142,11 +174,23 @@ class MainActivity : AppCompatActivity() {
 
         val datos = sums.map { it to Suministros.comprobantes(this, it.clave) }
         lista.addView(bandaResumen(datos))
+        Avisos.versionGuardada(this)?.let { v -> lista.addView(bannerVersion(v)) }
         if (leyendo) lista.addView(texto("Leyendo tus facturas…", 12.5f, color = GRIS_TEXTO)
             .apply { setPadding(dp(20), dp(12), dp(20), 0) })
         lista.addView(titulo("Mis conexiones", "${sums.size}"))
         datos.forEach { (s, comps) -> lista.addView(tarjetaConexion(s, comps)) }
     }
+
+    private fun bannerVersion(v: Avisos.Version): View = tarjeta(fila().apply {
+        setPadding(dp(16), dp(14), dp(12), dp(14))
+        addView(iconoCircular(R.drawable.ic_bolt, Color.parseColor("#8A6400"), AMARILLO_CLARO, 40))
+        addView(vertical().apply {
+            setPadding(dp(12), 0, dp(8), 0)
+            addView(texto("Nueva versión ${v.nombre}", 15f, true))
+            addView(texto("Descargala e instalala encima; no perdés tus datos.", 12.5f, color = GRIS_TEXTO))
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(boton("Bajar") { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(v.url))) })
+    }, 10)
 
     private fun bandaBienvenida(): View = vertical().apply {
         setBackgroundColor(AZUL)

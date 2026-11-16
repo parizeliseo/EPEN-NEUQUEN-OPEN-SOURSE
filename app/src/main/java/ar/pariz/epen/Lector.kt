@@ -75,10 +75,12 @@ object Lector {
     )
     private val reExcluir = Regex(
         """total|subtotal|saldo|a\s*pagar|vencim|venc\.|importe\s+en\s+letras|son\s+pesos|""" +
-            """per[ií]odo|fecha|kwh|lectura|medidor|factor|tarifa\s+[a-z0-9]|cuit|c\.?u\.?i\.?t|n[°º]|hoja""",
+            """per[ií]odo|fecha|kwh|lectura|medidor|factor|tarifa\s+[a-z0-9]|cuit|c\.?u\.?i\.?t|n[°º]|hoja|""" +
+            """neto|gravad|imponible|exent|hist[oó]ric|promedio|anterior|cuota\s+\d|\bcae\b|c[oó]d\.?\s*barra|""" +
+            """redondeo|importe\s+(total|neto)|monto\s+total""",
         RegexOption.IGNORE_CASE
     )
-    private val reAlumbrado = Regex("""alumbr""", RegexOption.IGNORE_CASE)
+    private val reAlumbrado = Regex("""alumb|a\.\s?p\.\s?(?:munic|pub)""", RegexOption.IGNORE_CASE)
     private val reInteres = Regex("""inter[eé]s|recargo|punitorio|mora\b|actualizaci[oó]n""", RegexOption.IGNORE_CASE)
     private val reImpuesto = Regex(
         """\biva\b|i\.v\.a|impuesto|ingresos\s*brutos|ii\.?\s*bb|\btasa|\bley\b|fondo|contribuci|percepci|""" +

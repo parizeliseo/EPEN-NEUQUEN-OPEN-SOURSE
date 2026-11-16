@@ -275,12 +275,20 @@ data class ResumenAnual(
     val hasta: String
 ) {
     companion object {
+        /** Facturas con vencimiento en los últimos 12 meses, de la más nueva a la más vieja. */
+        fun delPeriodo(comps: List<Comprobante>, hoy: java.util.Calendar = java.util.Calendar.getInstance()): List<Comprobante> {
+            val fmt = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+            val hasta = fmt.format(hoy.time).toLong()
+            val desde = fmt.format((hoy.clone() as java.util.Calendar).apply { add(java.util.Calendar.YEAR, -1) }.time).toLong()
+            return comps.filter { it.orden in (desde + 1)..hasta }.sortedByDescending { it.orden }
+        }
+
         fun de(comps: List<Comprobante>, hoy: java.util.Calendar = java.util.Calendar.getInstance()): ResumenAnual {
             val fmt = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
             val hasta = fmt.format(hoy.time).toLong()
             val inicio = (hoy.clone() as java.util.Calendar).apply { add(java.util.Calendar.YEAR, -1) }
             val desde = fmt.format(inicio.time).toLong()
-            val anio = comps.filter { it.orden in (desde + 1)..hasta }
+            val anio = delPeriodo(comps, hoy)
             val vista = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US)
             return ResumenAnual(
                 facturas = anio.size,

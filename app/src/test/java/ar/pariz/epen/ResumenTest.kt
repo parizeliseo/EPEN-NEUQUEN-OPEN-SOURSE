@@ -49,4 +49,15 @@ class ResumenTest {
         assertEquals(2 * 150.45, r.intereses, 0.001)
         assertEquals(2, r.conDesglose)
     }
+
+    @Test fun alumbradoAbreviadoYRenglonesQueNoSonConceptos() {
+        val c = Lector.conceptos("""
+            Transf. Tasa Alumb. Público Municipal   2.100,00
+            Neto gravado IVA 21%                   18.000,00
+            Saldo anterior                          5.000,00
+            I.V.A. 21%                              3.780,00
+        """.trimIndent())
+        assertEquals(listOf(Categoria.ALUMBRADO, Categoria.IMPUESTO), c.map { it.categoria })
+        assertEquals(2100.0, c[0].importe, 0.001)
+    }
 }

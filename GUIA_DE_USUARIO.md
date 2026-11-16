@@ -1,6 +1,6 @@
 # Guía de usuario — EPEN al día ⚡
 
-**Versión 1.3** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
+**Versión 1.4** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
 
 ---
 
@@ -22,6 +22,8 @@
 14. [Solución de problemas](#14-solución-de-problemas)
 15. [Preguntas frecuentes](#15-preguntas-frecuentes)
 
+Anexo: [Avisos y actualización automática](#10-bis-avisos-y-actualización-automática)
+
 ---
 
 ## 1. Qué es y qué hace
@@ -39,6 +41,9 @@ EPEN al día ordena en el celular todo lo que ofrece el portal público [servici
 | **Registro de comprobantes** | Cada factura que el portal te muestra o que bajás queda anotada con su número, vencimiento, importe y consumo. |
 | **Resumen del último año** | Total facturado, kWh consumidos, impuestos y tasas, alumbrado público e intereses de los últimos 12 meses. |
 | **Detalle por factura** | Cada concepto de la factura agrupado por rubro. |
+| **Desglose de cada cuadro** | Tocando cualquier cuadro del resumen se ve en qué conceptos y en qué facturas se fue ese gasto. |
+| **Aviso de vencimiento** | Notificación con sonido el día anterior y el mismo día del vencimiento. |
+| **Actualización automática** | Relee los PDF sola y avisa cuando hay una versión nueva de la app. |
 | **Historial** | Gráficos de consumo (kWh) e importe por factura. |
 | **Mis facturas** | Archivo de PDF por conexión, disponible sin internet. |
 | **Respaldo** | Guardar y restaurar tus conexiones y su registro. |
@@ -49,7 +54,7 @@ EPEN al día ordena en el celular todo lo que ofrece el portal público [servici
 
 ## 2. Instalación
 
-1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.3.apk`.
+1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.4.apk`.
 2. Abrilo desde el teléfono. Si Android lo pide, habilitá **"Instalar apps de origen desconocido"** para el navegador o el gestor de archivos que estés usando.
 3. Tocá **Instalar**.
 
@@ -116,7 +121,7 @@ Es el centro de cada conexión. De arriba hacia abajo:
    - **Alumbrado público**.
    - **Intereses y recargos**: intereses por pago fuera de término, recargos y punitorios. Si no hubo, lo indica en verde.
 
-   Cada rubro muestra qué porcentaje representa del total. Ver [punto 10](#10-historial-y-resumen-del-último-año).
+   Cada rubro muestra qué porcentaje representa del total. **Tocando el total o cualquier cuadro** se abre su desglose (ver [punto 10](#10-historial-y-resumen-del-último-año)).
 3. **Última factura**: importe, aviso de vencimiento, número, consumo y el botón **Ver detalle**.
 4. **Consultar en EPEN**: cuatro accesos (Factura vigente, Deuda, Anteriores y Segmentación).
 5. **Historial**: gráfico de las últimas 12 facturas, con selector **Consumo (kWh)** / **Importe ($)**.
@@ -222,6 +227,14 @@ Cada vez que se guarda un PDF, la app lee:
 
 **Resumen del último año.** Suma las facturas cuyo vencimiento cae en los últimos 12 meses (por ejemplo, del 15/11/25 al 15/11/26). Cada factura se cuenta **una sola vez**, aunque figure con dos números o la hayas bajado más de una vez. Impuestos, alumbrado e intereses salen del detalle de cada PDF: si alguna factura del período solo se vio en el portal y no se bajó, la app avisa que los rubros pueden estar incompletos.
 
+**Desglose de cada cuadro.** Tocando un cuadro del resumen se abre una hoja con:
+
+- **Total facturado**: en qué se fue el dinero (energía y cargos, impuestos y tasas, alumbrado público, intereses, otros) y la lista de facturas del año. Si la suma de los conceptos leídos no coincide con el total de las facturas, la app lo advierte en rojo.
+- **Impuestos y tasas**, **Alumbrado público** e **Intereses y recargos**: el total del rubro, **por concepto** (por ejemplo IVA, ingresos brutos, tasa municipal) y **por factura**, con barras para comparar.
+- **Energía consumida**: los kWh de cada factura, el promedio, el máximo y el mínimo, y cuánto se pagó de energía y cargos fijos por kWh.
+
+Tocando cualquier factura de la lista se abre su detalle completo.
+
 **Gráfico del historial.**
 
 - Muestra hasta 12 facturas, con una escala en números redondos.
@@ -231,6 +244,29 @@ Cada vez que se guarda un PDF, la app lee:
 - Arriba se indica cuánto subió o bajó la última factura respecto del promedio.
 
 > **Sobre la precisión:** el EPEN no publica el formato de sus facturas, así que la lectura es automática y tolerante. Si un dato no está claro, la app lo deja vacío en lugar de inventarlo. Si un rubro te parece mal clasificado, abrí el detalle de esa factura, tocá **Compartir texto leído (para soporte)** y mandalo en un *Issue* del repositorio: con eso se ajusta la lectura.
+
+---
+
+## 10 bis. Avisos y actualización automática
+
+**Aviso de vencimiento con sonido.** La app avisa con una notificación sonora:
+
+- **el día anterior** ("Mañana vence la factura de Terreno por $ …"), y
+- **el mismo día del vencimiento** ("Hoy vence…").
+
+La notificación tiene el botón **Pagar / descargar**, que abre la factura vigente de esa conexión. Toma el vencimiento de la última factura registrada de cada conexión, así que conviene bajar cada factura nueva cuando llega. Si ya la pagaste, ignorá el aviso.
+
+- La primera vez que abrís la app, Android pide permiso para mostrar notificaciones: tocá **Permitir**.
+- Se activan o desactivan desde la pantalla principal: **⋮ → Avisos de vencimiento**.
+- El sonido y la vibración se ajustan en los ajustes de notificaciones de Android, canal *Vencimientos de facturas*.
+
+**Actualización automática.** Sin que tengas que hacer nada:
+
+- Cada vez que abrís la app, y también en segundo plano varias veces por día, se leen los PDF nuevos y se unen facturas repetidas.
+- Cuando una versión nueva de la app mejora la lectura de facturas, todos tus PDF se vuelven a leer solos.
+- Una vez por día la app revisa si hay una versión nueva publicada en GitHub. Si la hay, aparece un aviso en la pantalla principal (y una notificación) con el botón **Bajar**: se instala encima sin perder datos.
+
+Lo único que no puede hacerse en segundo plano es **consultar el portal del EPEN**, porque cada consulta exige escribir el código de verificación.
 
 ---
 
@@ -273,6 +309,7 @@ Los PDF no van en el respaldo, porque ya están en `Descargas/EPEN`.
 | "El portal no devolvió un PDF" | La sesión venció o el portal mostró una página en lugar del PDF. Repetí la consulta, o usá **Guardar página como PDF**. |
 | No aparece el botón Bajar todo | La página no tiene comprobantes descargables (por ejemplo, una página de error). |
 | Los gráficos no aparecen | Hacen falta al menos dos facturas en PDF con datos legibles. Probá **⋮ → Volver a leer mis facturas**. |
+| No suena el aviso de vencimiento | Revisá que estén activados (⋮ → Avisos de vencimiento) y que Android permita las notificaciones de la app con sonido. Algunos teléfonos con ahorro de batería agresivo demoran los avisos: excluí la app del ahorro de batería. |
 | Impuestos, alumbrado o intereses en $ 0 | Esos rubros salen del PDF: bajá las facturas del año desde **Anteriores** (con **Bajar todo**) y, si siguen en cero, compartí el texto leído para ajustar la lectura. |
 | Una factura aparecía dos veces | Desde la 1.3 se unen solas; si quedara alguna, usá **⋮ → Volver a leer mis facturas**. |
 | Un importe o consumo quedó mal | Abrí el PDF original para confirmarlo y reportalo en *Issues*. |
@@ -284,7 +321,7 @@ Los PDF no van en el respaldo, porque ya están en `Descargas/EPEN`.
 ## 15. Preguntas frecuentes
 
 **¿La app me avisa cuando llega una factura nueva?**
-No. Para consultar, el portal exige escribir el código de verificación en cada ingreso, así que no se puede revisar en segundo plano.
+Avisa el día anterior y el día del vencimiento de las facturas que ya están registradas. No puede detectar sola una factura nueva en el portal, porque cada consulta exige escribir el código de verificación.
 
 **¿Puedo usar la app con conexiones de otras personas?**
 Sí, el portal solo pide el número de conexión. Usalo con conexiones propias o con autorización de su titular.

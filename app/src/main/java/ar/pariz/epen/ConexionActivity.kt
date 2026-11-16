@@ -85,6 +85,7 @@ class ConexionActivity : AppCompatActivity() {
         Toast.makeText(this, "Leyendo tus facturas…", Toast.LENGTH_SHORT).show()
         thread {
             val n = Descargas.actualizarRegistro(this)
+            getSharedPreferences("epen", 0).edit().putInt("registro_version", Registro.VERSION_LECTOR).apply()
             runOnUiThread { dibujar(); Toast.makeText(this, "Listo: $n factura(s) leídas", Toast.LENGTH_SHORT).show() }
         }
     }
@@ -205,21 +206,35 @@ class ConexionActivity : AppCompatActivity() {
                     "los kWh consumidos y cuánto fue de impuestos, alumbrado público e intereses.", 13f, color = GRIS_TEXTO), lp(6))
                 return@apply
             }
-            addView(texto("Total facturado", 12.5f, color = GRIS_TEXTO), lp(10))
-            addView(texto(pesos(r.total), 30f, true))
-            addView(texto("${r.facturas} factura${if (r.facturas == 1) "" else "s"} en el período", 12.5f, color = GRIS_TEXTO))
+            val anio = ResumenAnual.delPeriodo(comps)
+            addView(vertical().apply {
+                setPadding(0, dp(10), 0, dp(4))
+                addView(texto("Total facturado", 12.5f, color = GRIS_TEXTO))
+                addView(texto(pesos(r.total), 30f, true))
+                addView(texto("${r.facturas} factura${if (r.facturas == 1) "" else "s"} en el período · ver desglose ›", 12.5f, color = AZUL))
+                tocable { desgloseTotal(anio, r) }
+            })
 
             val pct = { v: Double -> if (r.total > 0 && v > 0) "${"%.1f".format(v / r.total * 100).replace('.', ',')}% del total" else null }
+            val violeta = Color.parseColor("#6A3FB5")
+            val ocre = Color.parseColor("#8A6400")
             addView(grilla(listOf(
                 mosaico(R.drawable.ic_bolt, AZUL, AZUL_CLARO, "${miles(r.kwh)} kWh", "Energía consumida",
-                    if (r.facturas > 0) "≈ ${miles(r.kwh / r.facturas)} kWh por factura" else null),
-                mosaico(R.drawable.ic_percent, Color.parseColor("#6A3FB5"), Color.parseColor("#EFE8FA"),
-                    pesosCorto(r.impuestos), "Impuestos y tasas", pct(r.impuestos)),
-                mosaico(R.drawable.ic_lamp, Color.parseColor("#8A6400"), AMARILLO_CLARO,
-                    pesosCorto(r.alumbrado), "Alumbrado público", pct(r.alumbrado)),
+                    if (r.facturas > 0) "≈ ${miles(r.kwh / r.facturas)} kWh por factura" else null)
+                    .tocable { desgloseKwh(anio) },
+                mosaico(R.drawable.ic_percent, violeta, Color.parseColor("#EFE8FA"),
+                    pesosCorto(r.impuestos), "Impuestos y tasas", pct(r.impuestos))
+                    .tocable { desgloseRubro(Categoria.IMPUESTO, violeta, anio) },
+                mosaico(R.drawable.ic_lamp, ocre, AMARILLO_CLARO,
+                    pesosCorto(r.alumbrado), "Alumbrado público", pct(r.alumbrado))
+                    .tocable { desgloseRubro(Categoria.ALUMBRADO, ocre, anio) },
                 mosaico(R.drawable.ic_clock, if (r.intereses > 0) ROJO else VERDE, if (r.intereses > 0) ROJO_CLARO else VERDE_CLARO,
                     pesosCorto(r.intereses), "Intereses y recargos", pct(r.intereses) ?: "Sin intereses 👍")
+                    .tocable { desgloseRubro(Categoria.INTERES, if (r.intereses > 0) ROJO else VERDE, anio) }
             )), lp(14))
+            addView(texto("Tocá cada cuadro para ver el detalle", 11.5f, color = GRIS_TEXTO).apply {
+                gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0)
+            })
 
             if (r.conDesglose < r.facturas) addView(texto(
                 if (r.conDesglose == 0)
@@ -231,6 +246,164 @@ class ConexionActivity : AppCompatActivity() {
         }
         return tarjeta(contenido, 0).apply {
             (layoutParams as LinearLayout.LayoutParams).topMargin = -dp(10) // se apoya sobre la franja azul
+        }
+    }
+
+    // ---------------- desgloses del último año ----------------
+
+    private fun <T : View> T.tocable(accion: () -> Unit): T = apply {
+        isClickable = true
+        isFocusable = true
+        foreground = context.getDrawable(android.R.drawable.list_selector_background)
+        setOnClickListener { accion() }
+    }
+
+    /** Barra horizontal proporcional para las listas de desglose. */
+    private fun barra(fraccion: Double, color: Int): View = LinearLayout(this).apply {
+        background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#EEF2F6")) }
+        addView(View(context).apply {
+            background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(color) }
+        }, LinearLayout.LayoutParams(0, dp(6), fraccion.toFloat().coerceIn(0.02f, 1f)))
+        addView(View(context), LinearLayout.LayoutParams(0, dp(6), (1 - fraccion).toFloat().coerceIn(0f, 0.98f)))
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(6)).apply { topMargin = dp(4) }
+    }
+
+    private fun hoja(armar: LinearLayout.(BottomSheetDialog) -> Unit) {
+        val h = BottomSheetDialog(this)
+        val v = vertical(20)
+        v.armar(h)
+        h.setContentView(ScrollView(this).apply { addView(v) })
+        h.behavior.peekHeight = resources.displayMetrics.heightPixels * 3 / 4
+        h.show()
+    }
+
+    private fun LinearLayout.encabezadoHoja(icono: Int, color: Int, tituloT: String, valor: String, bajada: String) {
+        addView(fila().apply {
+            addView(iconoCircular(icono, color, Color.parseColor("#F1F4F8"), 40))
+            addView(vertical().apply {
+                setPadding(dp(12), 0, 0, 0)
+                addView(texto(tituloT, 13f, color = GRIS_TEXTO))
+                addView(texto(valor, 24f, true))
+            })
+        })
+        addView(texto(bajada, 12.5f, color = GRIS_TEXTO), lp(6))
+    }
+
+    /** Fila de una factura dentro de un desglose: mes, número, valor y barra. Tocándola abre su detalle. */
+    private fun LinearLayout.filaFactura(h: BottomSheetDialog, c: Comprobante, valor: String, fraccion: Double, color: Int, nota: String? = null) {
+        val s = Suministros.buscar(context, clave) ?: return
+        addView(vertical().apply {
+            setPadding(0, dp(10), 0, dp(10))
+            addView(fila().apply {
+                addView(texto(mesCorto(c.vencimiento), 14f, true), LinearLayout.LayoutParams(dp(64), LinearLayout.LayoutParams.WRAP_CONTENT))
+                addView(texto(nota ?: c.numero, 12.5f, color = GRIS_TEXTO).apply { maxLines = 1 },
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(texto(valor, 14f, true))
+                addView(icono(R.drawable.ic_chevron, GRIS_TEXTO, 16))
+            })
+            addView(barra(fraccion, color))
+            tocable { h.dismiss(); detalle(s, c) }
+        })
+    }
+
+    private fun desgloseRubro(cat: Categoria, color: Int, anio: List<Comprobante>) = hoja { h ->
+        val total = anio.sumOf { it.suma(cat) }
+        val icono = when (cat) {
+            Categoria.IMPUESTO -> R.drawable.ic_percent; Categoria.ALUMBRADO -> R.drawable.ic_lamp
+            Categoria.INTERES -> R.drawable.ic_clock; else -> R.drawable.ic_receipt
+        }
+        val conDetalle = anio.count { it.conceptos.isNotEmpty() }
+        encabezadoHoja(icono, color, "${cat.titulo} · último año", pesos(total),
+            "Suma de ${anio.size} factura${if (anio.size == 1) "" else "s"}" +
+                (if (conDetalle < anio.size) " (detalle leído de $conDetalle)" else "") +
+                (anio.sumOf { it.total ?: 0.0 }.takeIf { it > 0 && total > 0 }?.let { " · ${"%.1f".format(total / it * 100).replace('.', ',')}% de lo facturado" } ?: ""))
+
+        // por concepto
+        val porConcepto = anio.flatMap { it.conceptos }.filter { it.categoria == cat }
+            .groupBy { it.nombre.lowercase().replace(Regex("""\s+"""), " ") }
+            .map { (_, l) -> l.first().nombre to l.sumOf { it.importe } }
+            .sortedByDescending { it.second }
+        addView(texto("Por concepto", 15f, true), lp(18))
+        if (porConcepto.isEmpty()) {
+            addView(texto(
+                if (conDetalle == 0) "Todavía no hay facturas en PDF con detalle en este período. Bajalas desde \"Anteriores\" con \"Bajar todo\"."
+                else "No se encontraron conceptos de este rubro en las facturas leídas. Si tu factura sí los tiene, " +
+                    "abrí una factura y tocá \"Compartir texto leído\" para ajustar la lectura.",
+                13f, color = GRIS_TEXTO), lp(6))
+        } else porConcepto.forEach { (nombre, imp) ->
+            addView(vertical().apply {
+                setPadding(0, dp(8), 0, dp(4))
+                addView(fila().apply {
+                    addView(texto(nombre, 13.5f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(texto(pesos(imp), 13.5f, true))
+                })
+                addView(barra(if (total > 0) imp / total else 0.0, color))
+            })
+        }
+
+        // por factura
+        addView(texto("Por factura", 15f, true), lp(20))
+        val max = anio.maxOfOrNull { it.suma(cat) }?.takeIf { it > 0 } ?: 1.0
+        anio.forEachIndexed { i, c ->
+            if (i > 0) addView(separador())
+            val v = c.suma(cat)
+            filaFactura(h, c, if (c.conceptos.isEmpty()) "sin detalle" else pesos(v), v / max, color,
+                c.conceptos.filter { it.categoria == cat }.joinToString(", ") { it.nombre }.ifBlank { null })
+        }
+    }
+
+    private fun desgloseKwh(anio: List<Comprobante>) = hoja { h ->
+        val total = anio.sumOf { it.consumoKwh ?: 0 }
+        val con = anio.filter { it.consumoKwh != null }
+        encabezadoHoja(R.drawable.ic_bolt, AZUL, "Energía consumida · último año", "${miles(total)} kWh",
+            if (con.isEmpty()) "Sin datos de consumo todavía"
+            else "Promedio ${miles(total / con.size)} kWh por factura · máximo ${miles(con.maxOf { it.consumoKwh!! })} · mínimo ${miles(con.minOf { it.consumoKwh!! })}")
+        val energia = anio.sumOf { it.suma(Categoria.ENERGIA) }
+        if (energia > 0 && total > 0) addView(texto(
+            "Energía y cargos fijos: ${pesos(energia)} en el año (≈ ${pesos(energia / total)} por kWh, con cargos fijos incluidos)",
+            12.5f, color = GRIS_TEXTO), lp(4))
+        addView(texto("Por factura", 15f, true), lp(18))
+        val max = con.maxOfOrNull { it.consumoKwh!! }?.toDouble() ?: 1.0
+        anio.forEachIndexed { i, c ->
+            if (i > 0) addView(separador())
+            filaFactura(h, c, c.consumoKwh?.let { "${miles(it)} kWh" } ?: "—", (c.consumoKwh ?: 0) / max, AZUL,
+                c.periodo.takeIf { it.isNotBlank() }?.let { "Período $it" })
+        }
+    }
+
+    private fun desgloseTotal(anio: List<Comprobante>, r: ResumenAnual) = hoja { h ->
+        encabezadoHoja(R.drawable.ic_receipt, AZUL, "Total facturado · último año", pesos(r.total),
+            "${anio.size} facturas, del ${r.desde} al ${r.hasta}")
+        addView(texto("En qué se fue", 15f, true), lp(18))
+        val colores = mapOf(Categoria.ENERGIA to AZUL, Categoria.IMPUESTO to Color.parseColor("#6A3FB5"),
+            Categoria.ALUMBRADO to AMARILLO, Categoria.INTERES to ROJO, Categoria.OTRO to GRIS_TEXTO)
+        val conDetalle = anio.filter { it.conceptos.isNotEmpty() }
+        val baseDetalle = conDetalle.sumOf { it.total ?: 0.0 }
+        if (conDetalle.isEmpty()) addView(texto("Hace falta el detalle de las facturas en PDF para separar por rubro.", 13f, color = GRIS_TEXTO), lp(6))
+        else {
+            for (cat in Categoria.values()) {
+                val v = conDetalle.sumOf { it.suma(cat) }
+                if (v == 0.0) continue
+                addView(vertical().apply {
+                    setPadding(0, dp(8), 0, dp(4))
+                    addView(fila().apply {
+                        addView(texto(cat.titulo, 13.5f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                        addView(texto(pesos(v), 13.5f, true))
+                    })
+                    addView(barra(if (baseDetalle > 0) v / baseDetalle else 0.0, colores[cat]!!))
+                    if (cat != Categoria.ENERGIA && cat != Categoria.OTRO) tocable { h.dismiss(); desgloseRubro(cat, colores[cat]!!, anio) }
+                })
+            }
+            val suma = conDetalle.sumOf { c -> c.conceptos.sumOf { it.importe } }
+            if (baseDetalle > 0 && kotlin.math.abs(suma - baseDetalle) / baseDetalle > 0.05) addView(texto(
+                "Atención: la suma de los conceptos leídos (${pesos(suma)}) no coincide con el total de esas facturas " +
+                    "(${pesos(baseDetalle)}). Es probable que algún renglón se haya leído mal.", 12f, color = ROJO), lp(8))
+        }
+        addView(texto("Por factura", 15f, true), lp(20))
+        val max = anio.maxOfOrNull { it.total ?: 0.0 }?.takeIf { it > 0 } ?: 1.0
+        anio.forEachIndexed { i, c ->
+            if (i > 0) addView(separador())
+            filaFactura(h, c, c.total?.let { pesos(it) } ?: "—", (c.total ?: 0.0) / max, AZUL)
         }
     }
 
