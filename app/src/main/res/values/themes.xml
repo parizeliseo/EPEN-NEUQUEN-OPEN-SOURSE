@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.EpenAlDia" parent="Theme.Material3.Light">
+        <item name="colorPrimary">@color/epen_azul</item>
+        <item name="colorPrimaryDark">@color/epen_azul_osc</item>
+        <item name="colorSecondary">@color/epen_amarillo</item>
+        <item name="android:statusBarColor">@color/epen_azul_osc</item>
+        <item name="android:windowBackground">@color/fondo</item>
+        <item name="actionBarStyle">@style/EpenActionBar</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.Material3.Dark.ActionBar</item>
+    </style>
+    <style name="EpenActionBar" parent="Widget.Material3.ActionBar.Solid">
+        <item name="background">@color/epen_azul</item>
+        <item name="titleTextStyle">@style/EpenActionBarTitle</item>
+    </style>
+    <style name="EpenActionBarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@color/blanco</item>
+    </style>
+</resources>
