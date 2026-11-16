@@ -25,15 +25,26 @@ jobs:
           chmod +x gradlew
           ./gradlew testReleaseUnitTest assembleRelease --no-daemon
       - name: Renombrar APK
+        id: ver
         run: |
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/release/app-release.apk "EPEN-al-dia-v${VERSION}.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: EPEN-al-dia-apk
           path: EPEN-al-dia-v*.apk
+      # Cada versión nueva en main (versionName en app/build.gradle.kts) crea su Release
+      # con el APK; también se puede publicar con una etiqueta vX.Y.
       - name: Publicar en la Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: EPEN al día v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            APK listo para instalar en Android 8.0 o superior.
+            Guía: https://github.com/${{ github.repository }}/blob/main/GUIA_DE_USUARIO.md
           files: EPEN-al-dia-v*.apk
+          fail_on_unmatched_files: true
