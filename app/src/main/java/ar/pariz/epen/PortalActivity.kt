@@ -147,7 +147,7 @@ class PortalActivity : AppCompatActivity() {
         Seccion.ANTERIORES -> "Ya completé tu conexión" +
             (if (factura.isNotBlank()) " y el comprobante de referencia $factura" else "") +
             ". Escribí el código y tocá Ingresar. Después podés bajar todas las facturas de la lista con un toque."
-        else -> "Ya completé tu conexión. Escribí el código de la imagen y tocá Ingresar."
+        else -> "Ya completé tu conexión. Escribí el código tal cual la imagen (respetando minúsculas) y tocá Ingresar."
     }
 
     // ---------- Menú ----------
@@ -237,7 +237,7 @@ class PortalActivity : AppCompatActivity() {
           var st = document.createElement('style');
           st.textContent = '#header{display:none!important} body{background:#F3F6FA!important}' +
             '.main.container{border:none!important;max-width:100%!important}' +
-            'input.form-control{font-size:18px!important} #security_code{text-transform:uppercase;letter-spacing:4px;min-width:120px;font-size:22px!important}';
+            'input.form-control{font-size:18px!important} #security_code{text-transform:none!important;letter-spacing:4px;min-width:120px;font-size:22px!important}';
           document.head && document.head.appendChild(st);
 
           var s = document.querySelector('input[name=sumcto]');
@@ -246,7 +246,9 @@ class PortalActivity : AppCompatActivity() {
           if (f && !f.value && '${js(factura)}') f.value = '${js(factura)}';
           var c = document.getElementById('security_code');
           if (c) {
-            c.setAttribute('autocomplete','off'); c.setAttribute('autocapitalize','characters');
+            c.setAttribute('autocomplete','off'); c.setAttribute('autocapitalize','none');
+            c.setAttribute('autocorrect','off'); c.setAttribute('spellcheck','false');
+            c.placeholder = 'tal cual la imagen';
             var img = document.getElementById('capt') || document.querySelector('img[src*=captcha]');
             if (img) { img.style.width='160px'; img.style.height='auto'; img.style.cursor='pointer';
               img.title='Tocá para otro código'; img.onclick=function(){ window.recargar_captcha && recargar_captcha(); }; }

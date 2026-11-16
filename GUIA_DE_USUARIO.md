@@ -1,6 +1,6 @@
 # Guía de usuario — EPEN al día ⚡
 
-**Versión 1.1** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
+**Versión 1.2** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
 
 ---
 
@@ -47,13 +47,13 @@ EPEN al día ordena en el celular todo lo que ofrece el portal público [servici
 
 ## 2. Instalación
 
-1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.1.apk`.
+1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.2.apk`.
 2. Abrilo desde el teléfono. Si Android lo pide, habilitá **"Instalar apps de origen desconocido"** para el navegador o el gestor de archivos que estés usando.
 3. Tocá **Instalar**.
 
 **Requisitos:** Android 8.0 o superior, y conexión a internet para consultar el portal.
 
-**Si ya tenías la versión 1.0:** instalá la 1.1 encima. Tus conexiones se pasan solas al nuevo registro, y los PDF que ya habías bajado se leen y se anotan en su conexión la primera vez que abrís la app.
+**Si ya tenías una versión anterior:** instalá la nueva encima. Tus conexiones se pasan solas al nuevo registro, y los PDF que ya habías bajado se leen y se anotan en su conexión la primera vez que abrís la app.
 
 ---
 
@@ -116,7 +116,7 @@ Es el centro de cada conexión. De arriba hacia abajo:
 Al tocar una sección se abre el portal dentro de la app, ya preparado:
 
 1. El **N° de conexión** ya está escrito.
-2. Escribí el **código de verificación** de 4 caracteres que muestra la imagen. Si no se lee bien, **tocá la imagen** para que aparezca otro (o **⋮ → Nuevo código**).
+2. Escribí el **código de verificación** de 4 caracteres **tal cual aparece en la imagen**: el portal distingue mayúsculas de minúsculas (si ves "jp3b", escribí jp3b en minúscula). Si no se lee bien, **tocá la imagen** para que aparezca otro (o **⋮ → Nuevo código**).
 3. En **Deuda**, además, tildá la casilla de **aceptación de términos** (la app no la acepta por vos).
 4. Tocá **Ingresar**.
 
@@ -241,7 +241,7 @@ Los PDF no van en el respaldo, porque ya están en `Descargas/EPEN`.
 
 | Problema | Qué hacer |
 |---|---|
-| "ERROR en el código de verificación" | El código se escribió mal o venció. Tocá la imagen para uno nuevo y volvé a intentar. |
+| "ERROR en el código de verificación" | El código se escribió mal (revisá mayúsculas y minúsculas) o venció. Tocá la imagen para uno nuevo y volvé a intentar. |
 | La sesión se cierra en Deuda | El portal la cierra tras 5 minutos sin uso. Usá **⋮ → Volver a empezar**. |
 | "El portal no devolvió un PDF" | La sesión venció o el portal mostró una página en lugar del PDF. Repetí la consulta, o usá **Guardar página como PDF**. |
 | No aparece el botón Bajar todo | La página no tiene comprobantes descargables (por ejemplo, una página de error). |
