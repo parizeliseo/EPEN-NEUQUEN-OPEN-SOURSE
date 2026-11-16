@@ -1,10 +1,13 @@
 package ar.pariz.epen
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -13,17 +16,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
 
-/** Pantalla principal: todas las conexiones registradas, con su última factura conocida. */
+/** Inicio: resumen general y todas las conexiones registradas. */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var lista: LinearLayout
-    private val pesos = NumberFormat.getCurrencyInstance(Locale("es", "AR"))
+    private var leyendo = false
 
     private val exportar = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri ?: return@registerForActivityResult
@@ -40,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         try {
             val txt = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
             val (nuevas, comps) = Suministros.importar(this, txt)
+            Suministros.depurar(this)
             Toast.makeText(this, "$nuevas conexión(es) nuevas, $comps comprobante(s) procesados", Toast.LENGTH_LONG).show()
             dibujar()
         } catch (e: Exception) {
@@ -51,49 +54,64 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         title = getString(R.string.app_name)
 
-        lista = vertical().apply { setPadding(0, dp(8), 0, dp(96)) }
+        lista = vertical().apply { setPadding(0, 0, 0, dp(100)) }
         val fab = ExtendedFloatingActionButton(this).apply {
             text = "Agregar conexión"
             isAllCaps = false
+            setIconResource(R.drawable.ic_bolt)
             setOnClickListener { Editor.abrir(this@MainActivity, null) { dibujar() } }
         }
         setContentView(FrameLayout(this).apply {
-            addView(ScrollView(context).apply { addView(lista) })
+            addView(ScrollView(context).apply { addView(lista); isFillViewport = true })
             addView(fab, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM or Gravity.END
-            ).apply { setMargins(dp(16), dp(16), dp(16), dp(24)) })
+            ).apply { setMargins(dp(16), dp(16), dp(16), dp(20)) })
         })
 
-        // PDF bajados con la versión anterior: se leen y registran una sola vez.
-        if (savedInstanceState == null) thread {
-            if (Descargas.reindexar(this) > 0) runOnUiThread { dibujar() }
+        // Una vez por versión: vuelve a leer los PDF guardados (para sumar el detalle de
+        // impuestos, alumbrado e intereses) y une facturas que quedaron repetidas.
+        val prefs = getSharedPreferences("epen", Context.MODE_PRIVATE)
+        if (savedInstanceState == null && prefs.getInt("registro_version", 0) < 3) {
+            leyendo = true
+            thread {
+                Descargas.actualizarRegistro(this)
+                prefs.edit().putInt("registro_version", 3).apply()
+                runOnUiThread { leyendo = false; dibujar() }
+            }
         }
     }
 
     override fun onResume() { super.onResume(); dibujar() }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menu.add(0, 1, 0, "Mis facturas").setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
-        menu.add(0, 2, 1, "Guardar respaldo de conexiones")
-        menu.add(0, 3, 2, "Restaurar respaldo")
-        menu.add(0, 4, 3, "Acerca de")
+        menu.add(0, 1, 0, "Mis facturas").setIcon(R.drawable.ic_doc).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+        menu.add(0, 5, 1, "Volver a leer mis facturas")
+        menu.add(0, 2, 2, "Guardar respaldo de conexiones")
+        menu.add(0, 3, 3, "Restaurar respaldo")
+        menu.add(0, 4, 4, "Acerca de")
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             1 -> startActivity(Intent(this, ArchivoActivity::class.java))
-            2 -> exportar.launch("EPEN-al-dia-respaldo-" +
-                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) + ".json")
+            2 -> exportar.launch("EPEN-al-dia-respaldo-" + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) + ".json")
             3 -> importar.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+            5 -> {
+                leyendo = true; dibujar()
+                thread {
+                    val n = Descargas.actualizarRegistro(this)
+                    runOnUiThread { leyendo = false; dibujar(); Toast.makeText(this, "$n factura(s) leídas", Toast.LENGTH_SHORT).show() }
+                }
+            }
             4 -> MaterialAlertDialogBuilder(this)
                 .setTitle("EPEN al día")
                 .setMessage(
-                    "App no oficial para consultar el portal de servicios del EPEN (servicios.epen.gov.ar).\n\n" +
-                        "Tus conexiones y comprobantes quedan registrados solo en este teléfono; podés guardar un " +
-                        "respaldo desde el menú. El código de verificación (captcha) lo escribís vos en cada consulta, " +
-                        "como en la web, y con un solo código podés bajar todas las facturas que liste la página."
+                    "Versión ${packageManager.getPackageInfo(packageName, 0).versionName}\n\n" +
+                        "App no oficial y de código abierto para consultar el portal de servicios del EPEN " +
+                        "(servicios.epen.gov.ar).\n\nTus conexiones y facturas quedan solo en este teléfono. " +
+                        "El código de verificación lo escribís vos en cada consulta, tal cual la imagen."
                 )
                 .setPositiveButton("Entendido", null).show()
         }
@@ -105,65 +123,108 @@ class MainActivity : AppCompatActivity() {
         val sums = Suministros.listar(this)
 
         if (sums.isEmpty()) {
+            lista.addView(bandaBienvenida())
             lista.addView(tarjeta(vertical(24).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                addView(texto("⚡", 48f).apply { gravity = Gravity.CENTER })
-                addView(texto("Registrá tu conexión", 20f, true).apply { gravity = Gravity.CENTER })
-                addView(texto(
-                    "La encontrás en tu factura como \"Suministro/Contrato\", por ejemplo 118310/1. Podés registrar todas las que quieras.",
-                    15f, color = GRIS_TEXTO
-                ).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, dp(16)) })
-                addView(boton("Agregar conexión") { Editor.abrir(this@MainActivity, null) { dibujar() } })
+                addView(iconoCircular(R.drawable.ic_bolt, AZUL, AZUL_CLARO, 64))
+                addView(texto("Registrá tu primera conexión", 19f, true).apply { gravity = Gravity.CENTER; setPadding(0, dp(14), 0, 0) })
+                addView(texto("La encontrás en tu factura como \"Suministro/Contrato\", por ejemplo 118310/1. " +
+                    "Podés registrar todas las que quieras.", 14f, color = GRIS_TEXTO)
+                    .apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, dp(18)) })
+                addView(boton("Agregar conexión") { Editor.abrir(this@MainActivity, null) { dibujar() } },
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
                 addView(boton("Restaurar un respaldo", relleno = false) {
                     importar.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
                 }, lp(6))
-            }))
+            }, 0).apply { (layoutParams as LinearLayout.LayoutParams).topMargin = -dp(12) })
             return
         }
 
-        lista.addView(texto("${sums.size} conexión(es) registradas", 13f, color = GRIS_TEXTO)
-            .apply { setPadding(dp(18), dp(6), dp(18), 0) })
-        for (s in sums) lista.addView(tarjeta(fila(s)).apply {
-            isClickable = true
-            setOnClickListener { abrirConexion(s) }
+        val datos = sums.map { it to Suministros.comprobantes(this, it.clave) }
+        lista.addView(bandaResumen(datos))
+        if (leyendo) lista.addView(texto("Leyendo tus facturas…", 12.5f, color = GRIS_TEXTO)
+            .apply { setPadding(dp(20), dp(12), dp(20), 0) })
+        lista.addView(titulo("Mis conexiones", "${sums.size}"))
+        datos.forEach { (s, comps) -> lista.addView(tarjetaConexion(s, comps)) }
+    }
+
+    private fun bandaBienvenida(): View = vertical().apply {
+        setBackgroundColor(AZUL)
+        setPadding(dp(20), dp(8), dp(20), dp(30))
+        addView(texto("Tu energía, en orden", 22f, true, Color.WHITE))
+        addView(texto("Facturas, deuda e historial de tus conexiones del EPEN.", 14f, color = Color.parseColor("#CCFFFFFF")), lp(4))
+    }
+
+    /** Franja azul con los totales de todas las conexiones en el último año. */
+    private fun bandaResumen(datos: List<Pair<Suministro, List<Comprobante>>>): View = vertical().apply {
+        setBackgroundColor(AZUL)
+        setPadding(dp(20), dp(6), dp(20), dp(20))
+        val rs = datos.map { ResumenAnual.de(it.second) }
+        val total = rs.sumOf { it.total }
+        val kwh = rs.sumOf { it.kwh }
+        val proximas = datos.mapNotNull { (_, c) -> c.firstOrNull()?.vencimiento?.let(::diasHasta) }.filter { it in 0..10 }.size
+
+        addView(texto("Último año · todas las conexiones", 12.5f, color = Color.parseColor("#B3FFFFFF")))
+        addView(texto(if (total > 0) pesos(total) else "Sin facturas aún", 28f, true, Color.WHITE))
+        addView(fila().apply {
+            setPadding(0, dp(12), 0, 0)
+            fun dato(valor: String, rotulo: String) = vertical().apply {
+                addView(texto(valor, 16f, true, Color.WHITE))
+                addView(texto(rotulo, 12f, color = Color.parseColor("#B3FFFFFF")))
+            }
+            addView(dato("${miles(kwh)} kWh", "consumidos"), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(dato("${datos.size}", if (datos.size == 1) "conexión" else "conexiones"),
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(dato("$proximas", "vencen pronto"), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         })
     }
 
-    private fun fila(s: Suministro): LinearLayout = vertical(16).apply {
-        val comps = Suministros.comprobantes(context, s.clave)
+    private fun tarjetaConexion(s: Suministro, comps: List<Comprobante>): View {
         val ult = comps.firstOrNull { it.total != null || it.vencimiento.isNotBlank() }
-
-        addView(LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(vertical().apply {
-                addView(texto(s.nombre, 19f, true))
-                addView(texto("N° ${s.numero}", 15f, true, AZUL))
-                if (s.direccion.isNotBlank()) addView(texto(s.direccion, 13f, color = GRIS_TEXTO))
-            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            if (ult?.total != null) addView(vertical().apply {
-                gravity = Gravity.END
-                addView(texto(pesos.format(ult.total), 16f, true).apply { gravity = Gravity.END })
-                if (ult.vencimiento.isNotBlank()) addView(texto("vence ${ult.vencimiento}", 12f, color = GRIS_TEXTO))
+        val r = ResumenAnual.de(comps)
+        val v = vertical(16).apply {
+            addView(fila().apply {
+                gravity = Gravity.TOP
+                addView(iconoCircular(R.drawable.ic_bolt, AZUL, AZUL_CLARO, 44))
+                addView(vertical().apply {
+                    setPadding(dp(12), 0, dp(8), 0)
+                    addView(texto(s.nombre, 17f, true).apply { maxLines = 1 })
+                    addView(texto("N° ${s.numero}", 13.5f, true, AZUL))
+                    if (s.direccion.isNotBlank()) addView(texto(s.direccion, 12.5f, color = GRIS_TEXTO).apply { maxLines = 1 })
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(vertical().apply {
+                    gravity = Gravity.END
+                    addView(texto(ult?.total?.let { pesos(it) } ?: "—", 16f, true).apply { gravity = Gravity.END })
+                    ult?.vencimiento?.let { chipVencimiento(it) }?.let { chip ->
+                        addView(chip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                            .apply { topMargin = dp(4) })
+                    }
+                })
             })
-        })
-
-        val pdfs = comps.count { it.archivo.isNotBlank() }
-        addView(texto(
-            if (comps.isEmpty()) "Sin comprobantes todavía" else "${comps.size} comprobante(s) · $pdfs PDF",
-            12f, color = GRIS_TEXTO
-        ), lp(6))
-
-        addView(LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(8), 0, 0)
-            addView(boton("Factura vigente") { lanzar(s, Seccion.FACTURA) },
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(boton("Deuda", relleno = false) { lanzar(s, Seccion.DEUDA) },
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
-            addView(boton("Ver más", relleno = false) { abrirConexion(s) },
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
-        })
+            if (r.facturas > 0) addView(fila().apply {
+                setPadding(0, dp(12), 0, 0)
+                fun mini(valor: String, rotulo: String) = vertical().apply {
+                    addView(texto(valor, 13.5f, true))
+                    addView(texto(rotulo, 11.5f, color = GRIS_TEXTO))
+                }
+                addView(mini("${miles(r.kwh)} kWh", "último año"), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(mini(pesosCorto(r.total), "facturado"), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(mini("${comps.size}", "comprobantes"), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            })
+            addView(fila().apply {
+                setPadding(0, dp(12), 0, 0)
+                addView(boton("Factura") { lanzar(s, Seccion.FACTURA) },
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(boton("Deuda", relleno = false) { lanzar(s, Seccion.DEUDA) },
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
+                addView(boton("Ver todo", relleno = false) { abrirConexion(s) },
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
+            })
+        }
+        return tarjeta(v).apply {
+            isClickable = true
+            setOnClickListener { abrirConexion(s) }
+        }
     }
 
     private fun abrirConexion(s: Suministro) =

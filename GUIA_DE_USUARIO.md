@@ -1,6 +1,6 @@
 # Guía de usuario — EPEN al día ⚡
 
-**Versión 1.2** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
+**Versión 1.3** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
 
 ---
 
@@ -15,7 +15,7 @@
 7. [Bajar varias facturas con un solo código](#7-bajar-varias-facturas-con-un-solo-código)
 8. [Facturas anteriores y comprobante de referencia](#8-facturas-anteriores-y-comprobante-de-referencia)
 9. [Mis facturas](#9-mis-facturas)
-10. [Historial de consumo e importes](#10-historial-de-consumo-e-importes)
+10. [Historial y resumen del último año](#10-historial-y-resumen-del-último-año)
 11. [Pagar](#11-pagar)
 12. [Respaldo y cambio de teléfono](#12-respaldo-y-cambio-de-teléfono)
 13. [Privacidad](#13-privacidad)
@@ -37,6 +37,8 @@ EPEN al día ordena en el celular todo lo que ofrece el portal público [servici
 | **Segmentación tarifaria** | Consultar el nivel de subsidio de la conexión. |
 | **Bajar todo** | Con un solo código de verificación, descargar todos los comprobantes que muestra el portal. |
 | **Registro de comprobantes** | Cada factura que el portal te muestra o que bajás queda anotada con su número, vencimiento, importe y consumo. |
+| **Resumen del último año** | Total facturado, kWh consumidos, impuestos y tasas, alumbrado público e intereses de los últimos 12 meses. |
+| **Detalle por factura** | Cada concepto de la factura agrupado por rubro. |
 | **Historial** | Gráficos de consumo (kWh) e importe por factura. |
 | **Mis facturas** | Archivo de PDF por conexión, disponible sin internet. |
 | **Respaldo** | Guardar y restaurar tus conexiones y su registro. |
@@ -47,7 +49,7 @@ EPEN al día ordena en el celular todo lo que ofrece el portal público [servici
 
 ## 2. Instalación
 
-1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.2.apk`.
+1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.3.apk`.
 2. Abrilo desde el teléfono. Si Android lo pide, habilitá **"Instalar apps de origen desconocido"** para el navegador o el gestor de archivos que estés usando.
 3. Tocá **Instalar**.
 
@@ -74,21 +76,32 @@ Podés registrar todas las conexiones que quieras. Para cambiar o borrar una, en
 
 ## 4. Pantalla principal
 
-Muestra todas tus conexiones registradas. Cada tarjeta tiene:
+Arriba, en la franja azul, está el **resumen de todas tus conexiones** en el último año:
 
-- **Nombre** y **N° de conexión**, más la dirección si la cargaste.
-- **Importe y vencimiento** de la última factura registrada, si la app ya la conoce.
-- Cuántos **comprobantes** y **PDF** tiene guardados.
-- Tres botones: **Factura vigente**, **Deuda** y **Ver más** (abre la ficha).
+- Total facturado.
+- kWh consumidos.
+- Cantidad de conexiones.
+- Cuántas facturas vencen en los próximos 10 días.
 
-Tocando cualquier parte de la tarjeta también se abre la ficha.
+Debajo, una tarjeta por conexión con:
+
+- **Nombre**, **N° de conexión** y dirección.
+- **Importe de la última factura** y un aviso de vencimiento: *Vence el…* (azul), *Vence en N días* (amarillo, a 7 días o menos), *Vence hoy* (rojo) o *Venció el…* (gris).
+- **kWh y total facturado del último año**, y cantidad de comprobantes.
+- Botones **Factura**, **Deuda** y **Ver todo** (abre la ficha). Tocando la tarjeta también se abre la ficha.
 
 **Menú ⋮ de la pantalla principal:**
 
-- **Mis facturas**: todos los PDF descargados.
-- **Guardar respaldo de conexiones**.
-- **Restaurar respaldo**.
-- **Acerca de**.
+- **Mis facturas** (ícono de documento): todos los PDF descargados.
+- **Volver a leer mis facturas**: relee los PDF guardados y recalcula totales.
+- **Guardar respaldo de conexiones** y **Restaurar respaldo**.
+- **Acerca de** (muestra la versión).
+
+### Moverse por la app
+
+- El botón **Inicio** (ícono de casa, arriba a la derecha) aparece en la ficha de la conexión, en el portal y en *Mis facturas*: te lleva directo a la pantalla principal.
+- En la ficha, la fila de **chips con los nombres de tus conexiones** (arriba, sobre la franja azul) permite saltar de una conexión a otra sin volver al inicio.
+- Dentro del portal, **⋮ → Ficha de la conexión** te devuelve a la ficha de esa conexión.
 
 ---
 
@@ -96,18 +109,31 @@ Tocando cualquier parte de la tarjeta también se abre la ficha.
 
 Es el centro de cada conexión. De arriba hacia abajo:
 
-1. **N° de conexión** en grande, con botón **Copiar** (útil para reclamos o trámites), y los datos de titular, dirección y notas.
-2. **Última factura registrada**: importe, número, vencimiento y consumo.
-3. **Consultar en EPEN**: acceso a las cuatro secciones del portal.
-4. **Gráficos** de consumo e importe (aparecen cuando hay al menos dos facturas con datos).
-5. **Comprobantes registrados**: todos los que la app vio o descargó, del más nuevo al más viejo. Cada uno indica si es un **PDF** guardado o si solo se **vio en el portal**, y permite **Abrir**, **Compartir** o **Usar de referencia**.
+1. **Selector de conexiones** (si tenés más de una) y **franja azul** con el N° de conexión en grande, el botón **Copiar** y los datos de titular, dirección y notas.
+2. **Último año**: el período cubierto (los últimos 12 meses), el total facturado, la cantidad de facturas y cuatro mosaicos:
+   - **Energía consumida**: kWh totales y promedio por factura.
+   - **Impuestos y tasas**: IVA, ingresos brutos, tasas municipales, leyes y fondos provinciales, percepciones.
+   - **Alumbrado público**.
+   - **Intereses y recargos**: intereses por pago fuera de término, recargos y punitorios. Si no hubo, lo indica en verde.
+
+   Cada rubro muestra qué porcentaje representa del total. Ver [punto 10](#10-historial-y-resumen-del-último-año).
+3. **Última factura**: importe, aviso de vencimiento, número, consumo y el botón **Ver detalle**.
+4. **Consultar en EPEN**: cuatro accesos (Factura vigente, Deuda, Anteriores y Segmentación).
+5. **Historial**: gráfico de las últimas 12 facturas, con selector **Consumo (kWh)** / **Importe ($)**.
+6. **Comprobantes**: todos los registrados, del más nuevo al más viejo, con mes, número, kWh, importe y si es PDF o solo se vio en el portal. Tocando uno se abre su **detalle**.
+
+**Detalle de una factura** (hoja que se abre desde abajo):
+
+- Importe, aviso de vencimiento, números de factura y liquidación, período y consumo.
+- **Detalle por rubro**: cada concepto leído del PDF (cargo fijo, energía, alumbrado, IVA, tasas, intereses…) con su importe y el subtotal de cada rubro.
+- Botones **Abrir PDF**, **Compartir**, **Usar como referencia para Anteriores** y **Compartir texto leído (para soporte)**.
 
 **Menú ⋮ de la ficha:**
 
-- **Editar**: cambiar datos o borrar la conexión. Si borrás una conexión, se borra su registro de comprobantes, pero los PDF quedan en *Mis facturas*.
+- **Editar conexión**: cambiar datos o borrarla. Si la borrás, se borra su registro de comprobantes, pero los PDF quedan en *Mis facturas*.
 - **Copiar N° de conexión**.
-- **Compartir datos**: envía por WhatsApp, mail, etc. el nombre, número, titular y dirección.
-- **Volver a leer mis PDF**: vuelve a extraer importe, vencimiento y consumo de los PDF guardados.
+- **Compartir datos**: envía el nombre, número, titular y dirección.
+- **Volver a leer mis facturas**.
 
 ---
 
@@ -186,24 +212,25 @@ Todo funciona **sin internet**.
 
 ---
 
-## 10. Historial de consumo e importes
+## 10. Historial y resumen del último año
 
-Cada vez que se guarda un PDF, la app intenta leer:
+Cada vez que se guarda un PDF, la app lee:
 
-- N° de factura y N° de liquidación
-- Fecha de vencimiento
-- Total a pagar
-- Consumo en kWh
-- Período facturado
+- N° de factura y N° de liquidación (quedan unidos en un solo comprobante).
+- Fecha de vencimiento, total a pagar, consumo en kWh y período.
+- **Cada concepto** con su importe, clasificado en: *Energía y cargos*, *Impuestos y tasas*, *Alumbrado público*, *Intereses y recargos* u *Otros*.
 
-Con esos datos, la ficha de la conexión muestra:
+**Resumen del último año.** Suma las facturas cuyo vencimiento cae en los últimos 12 meses (por ejemplo, del 15/11/25 al 15/11/26). Cada factura se cuenta **una sola vez**, aunque figure con dos números o la hayas bajado más de una vez. Impuestos, alumbrado e intereses salen del detalle de cada PDF: si alguna factura del período solo se vio en el portal y no se bajó, la app avisa que los rubros pueden estar incompletos.
 
-- **Consumo por factura (kWh)** y **Importe por factura ($)**: barras de hasta las últimas 12 facturas, con la más reciente resaltada en amarillo.
-- **Última vs. promedio**: cuánto subió o bajó la última factura respecto del promedio, en porcentaje.
+**Gráfico del historial.**
 
-Los gráficos aparecen cuando hay al menos dos facturas con fecha de vencimiento y el dato correspondiente.
+- Muestra hasta 12 facturas, con una escala en números redondos.
+- La línea amarilla punteada es el **promedio**.
+- La barra de la última factura va en azul fuerte.
+- **Tocando una barra** se ve su mes y su valor.
+- Arriba se indica cuánto subió o bajó la última factura respecto del promedio.
 
-> **Sobre la precisión:** el EPEN no publica el formato de sus facturas, así que la lectura es automática y tolerante. Si un dato no está claro, la app lo deja vacío en lugar de inventarlo. Si ves algo raro, abrí el PDF original y avisá en *Issues* del repositorio.
+> **Sobre la precisión:** el EPEN no publica el formato de sus facturas, así que la lectura es automática y tolerante. Si un dato no está claro, la app lo deja vacío en lugar de inventarlo. Si un rubro te parece mal clasificado, abrí el detalle de esa factura, tocá **Compartir texto leído (para soporte)** y mandalo en un *Issue* del repositorio: con eso se ajusta la lectura.
 
 ---
 
@@ -245,7 +272,9 @@ Los PDF no van en el respaldo, porque ya están en `Descargas/EPEN`.
 | La sesión se cierra en Deuda | El portal la cierra tras 5 minutos sin uso. Usá **⋮ → Volver a empezar**. |
 | "El portal no devolvió un PDF" | La sesión venció o el portal mostró una página en lugar del PDF. Repetí la consulta, o usá **Guardar página como PDF**. |
 | No aparece el botón Bajar todo | La página no tiene comprobantes descargables (por ejemplo, una página de error). |
-| Los gráficos no aparecen | Hacen falta al menos dos facturas en PDF con datos legibles. Probá **⋮ → Volver a leer mis PDF** en la ficha. |
+| Los gráficos no aparecen | Hacen falta al menos dos facturas en PDF con datos legibles. Probá **⋮ → Volver a leer mis facturas**. |
+| Impuestos, alumbrado o intereses en $ 0 | Esos rubros salen del PDF: bajá las facturas del año desde **Anteriores** (con **Bajar todo**) y, si siguen en cero, compartí el texto leído para ajustar la lectura. |
+| Una factura aparecía dos veces | Desde la 1.3 se unen solas; si quedara alguna, usá **⋮ → Volver a leer mis facturas**. |
 | Un importe o consumo quedó mal | Abrí el PDF original para confirmarlo y reportalo en *Issues*. |
 | No se instala el APK | Revisá que esté habilitado "Instalar apps de origen desconocido" y que el teléfono tenga Android 8 o superior. |
 | El portal cambió y algo dejó de funcionar | Usá **⋮ → Abrir en el navegador** mientras tanto, y reportalo en *Issues*. |

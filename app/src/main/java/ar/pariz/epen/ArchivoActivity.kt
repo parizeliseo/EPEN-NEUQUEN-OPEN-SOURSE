@@ -26,6 +26,13 @@ class ArchivoActivity : AppCompatActivity() {
 
     override fun onSupportNavigateUp(): Boolean { finish(); return true }
 
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean { menu.agregarInicio(); return true }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        if (item.itemId == MENU_INICIO) { irAlInicio(); return true }
+        return super.onOptionsItemSelected(item)
+    }
+
     override fun onResume() { super.onResume(); dibujar() }
 
     private val nombreSeccion = mapOf(

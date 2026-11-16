@@ -11,7 +11,10 @@ App Android **no oficial y de código abierto** para gestionar tus conexiones de
 - **Bajar todo con un solo código**: descarga todos los comprobantes que liste la página de resultados en la misma sesión.
 - **Registro de comprobantes**: cada factura que ves o bajás queda anotada en su conexión con número, vencimiento, importe y consumo.
 - **Lectura de PDF**: extrae N° de factura y liquidación, vencimiento, total, kWh y período.
-- **Historial**: gráficos de consumo e importe por factura, con comparación contra el promedio.
+- **Resumen del último año**: total facturado, kWh, impuestos y tasas, alumbrado público e intereses, por conexión y en total.
+- **Detalle por factura**: cada concepto del PDF agrupado por rubro.
+- **Historial**: gráfico interactivo de consumo o importe, con escala y promedio.
+- **Navegación rápida**: botón Inicio en todas las pantallas y selector para pasar de una conexión a otra.
 - **Mis facturas**: archivo de PDF por conexión, sin duplicados, disponible sin conexión y copiado en `Descargas/EPEN`.
 - **Facturas anteriores asistidas**: elegís el comprobante de referencia de una lista en lugar de buscarlo en papel.
 - **Respaldo**: guardar y restaurar conexiones y registro en un archivo JSON.

@@ -6,6 +6,15 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.File
 
+/** Rubros en los que se agrupan los conceptos de una factura. */
+enum class Categoria(val titulo: String) {
+    IMPUESTO("Impuestos y tasas"), ALUMBRADO("Alumbrado público"), INTERES("Intereses y recargos"),
+    ENERGIA("Energía y cargos"), OTRO("Otros")
+}
+
+/** Un renglón de la factura: "Alumbrado Público  1.234,56". */
+data class Concepto(val nombre: String, val importe: Double, val categoria: Categoria)
+
 /** Datos que se pudieron leer de una factura o de una página del portal. */
 data class DatosLeidos(
     val factura: String? = null,      // 0001-00003217
@@ -13,7 +22,8 @@ data class DatosLeidos(
     val vencimiento: String = "",
     val total: Double? = null,
     val consumoKwh: Int? = null,
-    val periodo: String = ""
+    val periodo: String = "",
+    val conceptos: List<Concepto> = emptyList()
 ) {
     /** El número que mejor identifica al comprobante (el portal acepta cualquiera de los dos). */
     val numero: String? get() = factura ?: liquidacion
@@ -56,7 +66,54 @@ object Lector {
             .mapNotNull { it.groupValues[1].replace(".", "").toIntOrNull() }
             .firstOrNull { it in 1..200_000 }
         val periodo = rePeriodo.find(t)?.groupValues?.get(1)?.replace(Regex("\\s+"), " ") ?: ""
-        return DatosLeidos(factura, liq, venc, total, kwh, periodo)
+        return DatosLeidos(factura, liq, venc, total, kwh, periodo, conceptos(t))
+    }
+
+    // ---------- conceptos ----------
+    private val reRenglon = Regex(
+        """^(.*?\p{L}.*?)\s+\$?\s*(-?\d{1,3}(?:\.\d{3})*,\d{2}|-?\d+,\d{2})\s*$"""
+    )
+    private val reExcluir = Regex(
+        """total|subtotal|saldo|a\s*pagar|vencim|venc\.|importe\s+en\s+letras|son\s+pesos|""" +
+            """per[ií]odo|fecha|kwh|lectura|medidor|factor|tarifa\s+[a-z0-9]|cuit|c\.?u\.?i\.?t|n[°º]|hoja""",
+        RegexOption.IGNORE_CASE
+    )
+    private val reAlumbrado = Regex("""alumbr""", RegexOption.IGNORE_CASE)
+    private val reInteres = Regex("""inter[eé]s|recargo|punitorio|mora\b|actualizaci[oó]n""", RegexOption.IGNORE_CASE)
+    private val reImpuesto = Regex(
+        """\biva\b|i\.v\.a|impuesto|ingresos\s*brutos|ii\.?\s*bb|\btasa|\bley\b|fondo|contribuci|percepci|""" +
+            """municipal|provincial|tribut|\bfnee\b|\bfeesp\b|\bcammesa\b|gravamen|retenci""",
+        RegexOption.IGNORE_CASE
+    )
+    private val reEnergia = Regex("""energ|cargo|consumo|potencia|bonificaci|subsidio|descuento|segmentaci""", RegexOption.IGNORE_CASE)
+
+    fun categoria(nombre: String): Categoria = when {
+        reAlumbrado.containsMatchIn(nombre) -> Categoria.ALUMBRADO
+        reInteres.containsMatchIn(nombre) -> Categoria.INTERES
+        reImpuesto.containsMatchIn(nombre) -> Categoria.IMPUESTO
+        reEnergia.containsMatchIn(nombre) -> Categoria.ENERGIA
+        else -> Categoria.OTRO
+    }
+
+    /**
+     * Toma los renglones "descripción ... importe". El talón de pago suele repetir
+     * renglones, así que cada concepto se cuenta una sola vez.
+     */
+    fun conceptos(texto: String): List<Concepto> {
+        val vistos = linkedMapOf<String, Concepto>()
+        for (linea in texto.lines()) {
+            val m = reRenglon.find(linea.trim()) ?: continue
+            var nombre = m.groupValues[1].replace(Regex("""\s+"""), " ").trim()
+            // quita cantidades y precios unitarios que quedan pegados al nombre
+            nombre = nombre.replace(Regex("""(\s+(-?[\d.,%$]+|kwh|kw|unid\.?|\$))+$""", RegexOption.IGNORE_CASE), "")
+                .trim(' ', ':', '-', '$')
+            if (nombre.length < 3 || reExcluir.containsMatchIn(nombre)) continue
+            val importe = importe(m.groupValues[2]) ?: continue
+            if (importe == 0.0) continue
+            val clave = nombre.lowercase() + "|" + importe
+            if (clave !in vistos) vistos[clave] = Concepto(nombre.take(60), importe, categoria(nombre))
+        }
+        return vistos.values.toList()
     }
 
     /**

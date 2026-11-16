@@ -47,13 +47,22 @@ data class Comprobante(
     val archivo: String = "",        // nombre del PDF en Mis facturas, si se bajó
     val hash: String = "",
     val origen: String = "portal",   // "portal" o "pdf"
-    val visto: Long = System.currentTimeMillis()
+    val visto: Long = System.currentTimeMillis(),
+    val otroNumero: String = "",     // el otro número de la misma factura (liquidación o factura)
+    val conceptos: List<Concepto> = emptyList()
 ) {
     fun json(): JSONObject = JSONObject()
         .put("clave", clave).put("numero", numero).put("vencimiento", vencimiento)
         .put("total", total ?: JSONObject.NULL).put("consumoKwh", consumoKwh ?: JSONObject.NULL)
         .put("periodo", periodo).put("archivo", archivo).put("hash", hash)
-        .put("origen", origen).put("visto", visto)
+        .put("origen", origen).put("visto", visto).put("otroNumero", otroNumero)
+        .put("conceptos", JSONArray().apply {
+            conceptos.forEach { put(JSONObject().put("n", it.nombre).put("i", it.importe).put("c", it.categoria.name)) }
+        })
+
+    fun tieneNumero(n: String) = n.isNotBlank() && (numero == n || otroNumero == n)
+
+    fun suma(cat: Categoria): Double = conceptos.filter { it.categoria == cat }.sumOf { it.importe }
 
     /** Fecha de vencimiento como aaaammdd para ordenar; 0 si no se conoce. */
     val orden: Long
@@ -66,7 +75,14 @@ data class Comprobante(
             if (o.isNull("total")) null else o.optDouble("total"),
             if (o.isNull("consumoKwh")) null else o.optInt("consumoKwh"),
             o.optString("periodo"), o.optString("archivo"), o.optString("hash"),
-            o.optString("origen", "portal"), o.optLong("visto")
+            o.optString("origen", "portal"), o.optLong("visto"),
+            o.optString("otroNumero"),
+            (o.optJSONArray("conceptos") ?: JSONArray()).let { a ->
+                (0 until a.length()).map { a.getJSONObject(it) }.map {
+                    Concepto(it.optString("n"), it.optDouble("i"),
+                        runCatching { Categoria.valueOf(it.optString("c")) }.getOrDefault(Categoria.OTRO))
+                }
+            }
         )
     }
 }
@@ -156,7 +172,9 @@ object Suministros {
     /** Agrega o completa un comprobante: nunca pisa datos conocidos con vacíos. */
     fun registrar(ctx: Context, nuevo: Comprobante) = synchronized(lock) {
         val (lista, comps) = leer(ctx)
-        val i = comps.indexOfFirst { it.clave == nuevo.clave && it.numero == nuevo.numero }
+        val i = comps.indexOfFirst {
+            it.clave == nuevo.clave && (it.tieneNumero(nuevo.numero) || it.tieneNumero(nuevo.otroNumero))
+        }
         if (i < 0) comps.add(nuevo) else {
             val v = comps[i]
             comps[i] = v.copy(
@@ -167,10 +185,45 @@ object Suministros {
                 archivo = nuevo.archivo.ifBlank { v.archivo },
                 hash = nuevo.hash.ifBlank { v.hash },
                 origen = if (nuevo.origen == "pdf" || v.origen == "pdf") "pdf" else v.origen,
-                visto = maxOf(v.visto, nuevo.visto)
+                visto = maxOf(v.visto, nuevo.visto),
+                otroNumero = v.otroNumero.ifBlank {
+                    listOf(nuevo.numero, nuevo.otroNumero).firstOrNull { it.isNotBlank() && it != v.numero }.orEmpty()
+                },
+                conceptos = nuevo.conceptos.ifEmpty { v.conceptos }
             )
         }
         escribir(ctx, lista, comps)
+    }
+
+    /**
+     * Une comprobantes repetidos de una misma factura (la v1.1 registraba aparte el N° de
+     * factura y el de liquidación). Se consideran la misma factura si coinciden conexión,
+     * vencimiento e importe. Devuelve cuántos se unieron.
+     */
+    fun depurar(ctx: Context): Int = synchronized(lock) {
+        val (lista, comps) = leer(ctx)
+        val salida = mutableListOf<Comprobante>()
+        var unidos = 0
+        for (c in comps.sortedByDescending { it.archivo.isNotBlank() }) {
+            val j = salida.indexOfFirst { o ->
+                o.clave == c.clave && (
+                    o.tieneNumero(c.numero) ||
+                        (c.vencimiento.isNotBlank() && c.total != null &&
+                            o.vencimiento == c.vencimiento && o.total == c.total)
+                    )
+            }
+            if (j < 0) { salida.add(c); continue }
+            val o = salida[j]
+            salida[j] = o.copy(
+                otroNumero = o.otroNumero.ifBlank { c.numero.takeIf { it != o.numero }.orEmpty() },
+                consumoKwh = o.consumoKwh ?: c.consumoKwh,
+                periodo = o.periodo.ifBlank { c.periodo },
+                conceptos = o.conceptos.ifEmpty { c.conceptos }
+            )
+            unidos++
+        }
+        if (unidos > 0) escribir(ctx, lista, salida)
+        unidos
     }
 
     fun archivoConHash(ctx: Context, hash: String): String? =
@@ -205,6 +258,43 @@ object Suministros {
         val c = o.optJSONArray("comprobantes") ?: JSONArray()
         for (i in 0 until c.length()) registrar(ctx, Comprobante.de(c.getJSONObject(i)))
         nuevas to c.length()
+    }
+}
+
+/** Totales de los últimos 12 meses de una conexión, contando cada factura una sola vez. */
+data class ResumenAnual(
+    val facturas: Int,
+    val kwh: Int,
+    val total: Double,
+    val impuestos: Double,
+    val alumbrado: Double,
+    val intereses: Double,
+    val energia: Double,
+    val conDesglose: Int,          // facturas de las que se pudo leer el detalle
+    val desde: String,
+    val hasta: String
+) {
+    companion object {
+        fun de(comps: List<Comprobante>, hoy: java.util.Calendar = java.util.Calendar.getInstance()): ResumenAnual {
+            val fmt = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+            val hasta = fmt.format(hoy.time).toLong()
+            val inicio = (hoy.clone() as java.util.Calendar).apply { add(java.util.Calendar.YEAR, -1) }
+            val desde = fmt.format(inicio.time).toLong()
+            val anio = comps.filter { it.orden in (desde + 1)..hasta }
+            val vista = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US)
+            return ResumenAnual(
+                facturas = anio.size,
+                kwh = anio.sumOf { it.consumoKwh ?: 0 },
+                total = anio.sumOf { it.total ?: 0.0 },
+                impuestos = anio.sumOf { it.suma(Categoria.IMPUESTO) },
+                alumbrado = anio.sumOf { it.suma(Categoria.ALUMBRADO) },
+                intereses = anio.sumOf { it.suma(Categoria.INTERES) },
+                energia = anio.sumOf { it.suma(Categoria.ENERGIA) },
+                conDesglose = anio.count { it.conceptos.isNotEmpty() },
+                desde = vista.format(inicio.time),
+                hasta = vista.format(hoy.time)
+            )
+        }
     }
 }
 

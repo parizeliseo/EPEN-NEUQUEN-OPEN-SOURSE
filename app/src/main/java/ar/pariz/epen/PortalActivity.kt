@@ -152,6 +152,8 @@ class PortalActivity : AppCompatActivity() {
 
     // ---------- Menú ----------
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.agregarInicio()
+        menu.add(0, 7, 0, "Ficha de la conexión")
         menu.add(0, 6, 0, "Bajar todas las de esta página")
         menu.add(0, 1, 1, "Nuevo código")
         menu.add(0, 2, 2, "Guardar página como PDF")
@@ -164,6 +166,13 @@ class PortalActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             android.R.id.home -> finish()
+            MENU_INICIO -> irAlInicio()
+            7 -> {
+                startActivity(Intent(this, ConexionActivity::class.java)
+                    .putExtra(ConexionActivity.EXTRA_CLAVE, clave)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                finish()
+            }
             1 -> web.evaluateJavascript("window.recargar_captcha && recargar_captcha();", null)
             2 -> imprimirPagina()
             3 -> startActivity(Intent(this, ArchivoActivity::class.java))

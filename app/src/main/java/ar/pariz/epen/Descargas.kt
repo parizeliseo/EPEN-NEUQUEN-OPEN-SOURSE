@@ -91,12 +91,9 @@ object Descargas {
             clave = clave,
             numero = datos.numero ?: "PDF ${fecha.take(10)}",
             vencimiento = datos.vencimiento, total = datos.total, consumoKwh = datos.consumoKwh,
-            periodo = datos.periodo, archivo = destino.name, hash = hash, origen = "pdf"
-        ))
-        // Si el PDF trae los dos números, el otro también queda registrado como referencia.
-        if (datos.factura != null && datos.liquidacion != null) Suministros.registrar(ctx, Comprobante(
-            clave = clave, numero = datos.liquidacion, vencimiento = datos.vencimiento,
-            total = datos.total, consumoKwh = datos.consumoKwh, periodo = datos.periodo, origen = "pdf"
+            periodo = datos.periodo, archivo = destino.name, hash = hash, origen = "pdf",
+            otroNumero = if (datos.factura != null) datos.liquidacion.orEmpty() else "",
+            conceptos = datos.conceptos
         ))
         return Guardado(destino, datos, false)
     }
@@ -113,10 +110,34 @@ object Descargas {
             val hash = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
             Suministros.registrar(ctx, Comprobante(
                 clave, d.numero ?: "PDF ${f.name.split("_").getOrNull(3) ?: ""}", d.vencimiento, d.total,
-                d.consumoKwh, d.periodo, f.name, hash, "pdf", f.lastModified()
+                d.consumoKwh, d.periodo, f.name, hash, "pdf", f.lastModified(),
+                if (d.factura != null) d.liquidacion.orEmpty() else "", d.conceptos
             ))
             n++
         }
+        return n
+    }
+
+    /**
+     * Vuelve a leer todos los PDF guardados (para sumar los conceptos a facturas bajadas
+     * con versiones anteriores) y une duplicados. Se ejecuta fuera del hilo principal.
+     */
+    fun actualizarRegistro(ctx: Context): Int {
+        reindexar(ctx)
+        var n = 0
+        for (c in Suministros.todosLosComprobantes(ctx).filter { it.archivo.isNotBlank() }) {
+            val f = File(carpeta(ctx), c.archivo)
+            if (!f.exists()) continue
+            val d = Lector.leerFactura(Lector.textoDePdf(ctx, f))
+            Suministros.registrar(ctx, c.copy(
+                vencimiento = d.vencimiento.ifBlank { c.vencimiento }, total = d.total ?: c.total,
+                consumoKwh = d.consumoKwh ?: c.consumoKwh, periodo = d.periodo.ifBlank { c.periodo },
+                otroNumero = c.otroNumero.ifBlank { if (d.factura != null) d.liquidacion.orEmpty() else "" },
+                conceptos = d.conceptos
+            ))
+            n++
+        }
+        Suministros.depurar(ctx)
         return n
     }
 

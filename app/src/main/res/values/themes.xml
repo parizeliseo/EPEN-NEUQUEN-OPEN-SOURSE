@@ -1,19 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.EpenAlDia" parent="Theme.Material3.Light">
         <item name="colorPrimary">@color/epen_azul</item>
-        <item name="colorPrimaryDark">@color/epen_azul_osc</item>
+        <item name="colorOnPrimary">@color/blanco</item>
+        <item name="colorPrimaryContainer">#E3EEF8</item>
+        <item name="colorOnPrimaryContainer">@color/epen_azul_osc</item>
         <item name="colorSecondary">@color/epen_amarillo</item>
-        <item name="android:statusBarColor">@color/epen_azul_osc</item>
+        <item name="colorSecondaryContainer">#DCE9F6</item>
+        <item name="colorOnSecondaryContainer">@color/epen_azul_osc</item>
+        <item name="colorSurface">@color/blanco</item>
+        <item name="colorOutline">#D5DCE5</item>
+        <item name="android:colorBackground">@color/fondo</item>
         <item name="android:windowBackground">@color/fondo</item>
+        <item name="android:statusBarColor">@color/epen_azul_osc</item>
+        <item name="android:navigationBarColor">@color/blanco</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <!-- Android 15 dibuja de borde a borde: la app conserva barras propias para no tapar contenido -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
         <item name="actionBarStyle">@style/EpenActionBar</item>
         <item name="actionBarTheme">@style/ThemeOverlay.Material3.Dark.ActionBar</item>
+        <item name="materialButtonStyle">@style/EpenBoton</item>
+        <item name="materialButtonOutlinedStyle">@style/EpenBotonContorno</item>
     </style>
     <style name="EpenActionBar" parent="Widget.Material3.ActionBar.Solid">
         <item name="background">@color/epen_azul</item>
-        <item name="titleTextStyle">@style/EpenActionBarTitle</item>
+        <item name="elevation">0dp</item>
+        <item name="titleTextStyle">@style/EpenActionBarTitulo</item>
+        <item name="subtitleTextStyle">@style/EpenActionBarSubtitulo</item>
     </style>
-    <style name="EpenActionBarTitle" parent="TextAppearance.Material3.TitleLarge">
+    <style name="EpenActionBarTitulo" parent="TextAppearance.Material3.TitleLarge">
         <item name="android:textColor">@color/blanco</item>
+    </style>
+    <style name="EpenActionBarSubtitulo" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">#CCFFFFFF</item>
+    </style>
+    <style name="EpenBoton" parent="Widget.Material3.Button">
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+    <style name="EpenBotonContorno" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="strokeColor">#C9D4E2</item>
     </style>
 </resources>
