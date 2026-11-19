@@ -26,7 +26,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
@@ -39,7 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * en el captcha. Con un solo captcha se pueden bajar todos los comprobantes que liste
  * la página de resultados; cada uno queda registrado en la conexión.
  */
-class PortalActivity : AppCompatActivity() {
+class PortalActivity : Pantalla() {
 
     companion object {
         const val EXTRA_SECCION = "seccion"

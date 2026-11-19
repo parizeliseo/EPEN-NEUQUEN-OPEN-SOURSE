@@ -45,7 +45,6 @@ object Avisos {
     }
 
     fun crearCanales(ctx: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
         val sonido = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         nm.createNotificationChannel(NotificationChannel(CANAL_VENC, "Vencimientos de facturas", NotificationManager.IMPORTANCE_HIGH).apply {

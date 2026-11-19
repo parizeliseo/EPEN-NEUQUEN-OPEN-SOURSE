@@ -161,7 +161,7 @@ fun Context.acceso(res: Int, tituloT: String, bajada: String, destacado: Boolean
         }
         isClickable = true
         isFocusable = true
-        foreground = context.getDrawable(android.R.drawable.list_selector_background)
+        foreground = context.efectoToque()
         setOnClickListener { onClick() }
         addView(icono(res, if (destacado) Color.WHITE else AZUL, 22))
         addView(texto(tituloT, 14.5f, true, if (destacado) Color.WHITE else TEXTO).apply { setPadding(0, dp(8), 0, 0) })
@@ -219,4 +219,11 @@ fun android.app.Activity.irAlInicio() {
 fun android.view.Menu.agregarInicio() {
     add(0, MENU_INICIO, 0, "Inicio").setIcon(R.drawable.ic_home)
         .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
+}
+
+/** Efecto de toque estándar del sistema (ondas en Android 5+). */
+fun Context.efectoToque(): android.graphics.drawable.Drawable? {
+    val tv = TypedValue()
+    theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+    return androidx.core.content.ContextCompat.getDrawable(this, tv.resourceId)
 }

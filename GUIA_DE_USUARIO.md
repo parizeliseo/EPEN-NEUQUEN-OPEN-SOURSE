@@ -1,6 +1,6 @@
 # Guía de usuario — EPEN al día ⚡
 
-**Versión 1.4** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
+**Versión 1.5** · App Android no oficial para gestionar tus conexiones del EPEN (Ente Provincial de Energía del Neuquén).
 
 ---
 
@@ -23,6 +23,20 @@
 15. [Preguntas frecuentes](#15-preguntas-frecuentes)
 
 Anexo: [Avisos y actualización automática](#10-bis-avisos-y-actualización-automática)
+
+---
+
+## Novedades de la versión 1.5
+
+- **Más rápida.** Tus conexiones y facturas se mantienen en memoria y se guardan de una sola vez. Con 1000 facturas, registrarlas pasó de 4,3 segundos a 0,13, y la pantalla de inicio se arma unas 3,5 veces más rápido.
+- **Relectura instantánea.** El texto de cada PDF se guarda la primera vez que se lee. Cuando una versión nueva mejora la lectura, tus facturas se vuelven a analizar sin abrir otra vez los PDF, y varios PDF nuevos se procesan en paralelo.
+- **Más capacidad.**
+  - Historial de hasta 2 años.
+  - PDF de hasta 25 MB sin agotar la memoria del teléfono.
+  - El registro se guarda de forma segura: si se corta la batería en el medio, no se pierde.
+- **Al día con Android 17.** La barra superior y los botones ya no quedan tapados por las barras del sistema ni por el teclado, en ninguna versión. En Android 8.0 se corrigió que los botones de navegación quedaban invisibles.
+- **APK más liviano:** pasó de 14,8 MB a 10 MB.
+- **Ícono temático:** en Android 13 o posterior, el ícono toma los colores de tu fondo de pantalla si activás los íconos temáticos.
 
 ---
 
@@ -54,11 +68,11 @@ EPEN al día ordena en el celular todo lo que ofrece el portal público [servici
 
 ## 2. Instalación
 
-1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.4.apk`.
+1. Entrá a la sección **Releases** del repositorio y descargá el archivo `EPEN-al-dia-v1.5.apk`.
 2. Abrilo desde el teléfono. Si Android lo pide, habilitá **"Instalar apps de origen desconocido"** para el navegador o el gestor de archivos que estés usando.
 3. Tocá **Instalar**.
 
-**Requisitos:** Android 8.0 o superior, y conexión a internet para consultar el portal.
+**Requisitos:** Android 8.0 o superior (probada hasta Android 17), y conexión a internet para consultar el portal.
 
 **Si ya tenías una versión anterior:** instalá la nueva encima. Tus conexiones se pasan solas al nuevo registro, y los PDF que ya habías bajado se leen y se anotan en su conexión la primera vez que abrís la app.
 
@@ -124,7 +138,7 @@ Es el centro de cada conexión. De arriba hacia abajo:
    Cada rubro muestra qué porcentaje representa del total. **Tocando el total o cualquier cuadro** se abre su desglose (ver [punto 10](#10-historial-y-resumen-del-último-año)).
 3. **Última factura**: importe, aviso de vencimiento, número, consumo y el botón **Ver detalle**.
 4. **Consultar en EPEN**: cuatro accesos (Factura vigente, Deuda, Anteriores y Segmentación).
-5. **Historial**: gráfico de las últimas 12 facturas, con selector **Consumo (kWh)** / **Importe ($)**.
+5. **Historial**: gráfico de consumo o importe, con selector **Consumo (kWh)** / **Importe ($)** y, si hay facturas de más de un año, **1 año** / **2 años**.
 6. **Comprobantes**: todos los registrados, del más nuevo al más viejo, con mes, número, kWh, importe y si es PDF o solo se vio en el portal. Tocando uno se abre su **detalle**.
 
 **Detalle de una factura** (hoja que se abre desde abajo):
@@ -237,7 +251,7 @@ Tocando cualquier factura de la lista se abre su detalle completo.
 
 **Gráfico del historial.**
 
-- Muestra hasta 12 facturas, con una escala en números redondos.
+- Muestra el último año, o los **últimos 2 años** (hasta 24 facturas) con el selector **2 años**, con una escala en números redondos.
 - La línea amarilla punteada es el **promedio**.
 - La barra de la última factura va en azul fuerte.
 - **Tocando una barra** se ve su mes y su valor.
@@ -329,8 +343,8 @@ Sí, el portal solo pide el número de conexión. Usalo con conexiones propias o
 **¿Dónde quedan los PDF?**
 Dentro de la app (*Mis facturas*) y en la carpeta `Descargas/EPEN` del teléfono.
 
-**¿Por qué el APK pesa unos 13 MB?**
-Incluye la biblioteca que lee el texto de los PDF para armar el historial.
+**¿Por qué el APK pesa unos 10 MB?**
+Incluye la biblioteca que lee el texto de los PDF para armar el historial. El resto de la app está optimizado y ocupa muy poco.
 
 **¿Cómo colaboro o reporto un error?**
 Abrí un *Issue* en el repositorio. Si podés, contá en qué sección pasó y qué mostraba la pantalla (sin publicar datos personales).

@@ -22,7 +22,7 @@ jobs:
       - name: Pruebas y compilación
         run: |
           chmod +x gradlew
-          ./gradlew testReleaseUnitTest assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle.log
+          ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon --stacktrace 2>&1 | tee gradle.log
           exit ${PIPESTATUS[0]}
       - name: Mostrar el motivo del error
         if: failure()
@@ -41,6 +41,13 @@ jobs:
         with:
           name: EPEN-al-dia-apk
           path: EPEN-al-dia-v*.apk
+      - name: Capturas de las pruebas de pantallas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas
+          path: app/build/capturas/*.png
+          if-no-files-found: ignore
       # Cada versión nueva en main (versionName en app/build.gradle.kts) crea su Release
       # con el APK; también se puede publicar con una etiqueta vX.Y.
       - name: Publicar en la Release

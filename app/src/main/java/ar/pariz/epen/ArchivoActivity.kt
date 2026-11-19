@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import java.text.SimpleDateFormat
@@ -12,7 +11,7 @@ import java.util.Date
 import java.util.Locale
 
 /** "Mis facturas": todos los PDF bajados, agrupados por suministro, disponibles sin conexión. */
-class ArchivoActivity : AppCompatActivity() {
+class ArchivoActivity : Pantalla() {
 
     private lateinit var lista: LinearLayout
 

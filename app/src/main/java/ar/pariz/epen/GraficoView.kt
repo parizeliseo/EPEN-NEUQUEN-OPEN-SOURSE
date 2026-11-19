@@ -21,6 +21,9 @@ class GraficoView(ctx: Context) : View(ctx) {
     private var datos: List<Pair<String, Double>> = emptyList()
     private var formato: (Double) -> String = { "%.0f".format(it) }
     private var elegida = -1
+    private val rect = RectF()   // reutilizado en cada dibujo (sin crear objetos en onDraw)
+
+    companion object { const val MAXIMO = 24 }
 
     private val barra = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#9DB9D6") }
     private val barraUltima = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AZUL }
@@ -42,9 +45,9 @@ class GraficoView(ctx: Context) : View(ctx) {
         typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
     }
 
-    /** [datos]: (etiqueta del mes, valor) de la más vieja a la más nueva. */
+    /** [datos]: (etiqueta del mes, valor) de la más vieja a la más nueva; se muestran hasta [MAXIMO]. */
     fun mostrar(datos: List<Pair<String, Double>>, formato: (Double) -> String) {
-        this.datos = datos.takeLast(12)
+        this.datos = datos.takeLast(MAXIMO)
         this.formato = formato
         elegida = this.datos.lastIndex
         invalidate()
@@ -84,10 +87,15 @@ class GraficoView(ctx: Context) : View(ctx) {
             val x1 = izq + (i + 1) * w - w * 0.2f
             val y = abajo - ((abajo - arriba) * (v / max)).toFloat()
             val p = when (i) { elegida -> barraElegida; datos.lastIndex -> barraUltima; else -> barra }
-            c.drawRoundRect(RectF(x0, y, x1, abajo), r, r, p)
+            rect.set(x0, y, x1, abajo); c.drawRoundRect(rect, r, r, p)
             c.drawRect(x0, (y + r).coerceAtMost(abajo), x1, abajo, p) // base recta
-            if (datos.size <= 8 || i % 2 == datos.lastIndex % 2)
-                c.drawText(etq, (x0 + x1) / 2, height - context.dp(6).toFloat(), mes)
+            val paso = when { datos.size <= 8 -> 1; datos.size <= 16 -> 2; else -> 3 }
+            if ((datos.lastIndex - i) % paso == 0)
+                run {
+                    val mitad = mes.measureText(etq) / 2
+                    val cx = ((x0 + x1) / 2).coerceIn(izq + mitad, width - mitad) // no se corta en los bordes
+                    c.drawText(etq, cx, height - context.dp(6).toFloat(), mes)
+                }
         }
 
         val yp = abajo - ((abajo - arriba) * (prom / max)).toFloat()
@@ -101,7 +109,7 @@ class GraficoView(ctx: Context) : View(ctx) {
             val cx = (izq + elegida * w + w / 2).coerceIn(izq + tw / 2, width - tw / 2)
             val y = abajo - ((abajo - arriba) * (v / max)).toFloat()
             val top = (y - context.dp(30)).coerceAtLeast(0f)
-            c.drawRoundRect(RectF(cx - tw / 2, top, cx + tw / 2, top + context.dp(24)), r, r, globo)
+            rect.set(cx - tw / 2, top, cx + tw / 2, top + context.dp(24)); c.drawRoundRect(rect, r, r, globo)
             c.drawText(txt, cx, top + context.dp(16), globoTxt)
         }
     }

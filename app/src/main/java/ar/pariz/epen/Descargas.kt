@@ -72,14 +72,15 @@ object Descargas {
             throw IllegalStateException("El portal no devolvió un PDF (puede que haya vencido la sesión).")
 
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        if (bytes.size > 25 * 1024 * 1024) throw IllegalStateException("El PDF es demasiado grande (más de 25 MB).")
         Suministros.archivoConHash(ctx, hash)?.let { nombre ->
             val f = File(carpeta(ctx), nombre)
-            if (f.exists()) return Guardado(f, Lector.leerFactura(Lector.textoDePdf(ctx, f)), true)
+            if (f.exists()) return Guardado(f, Lector.leerFactura(Lector.textoDePdf(ctx, f, hash)), true)
         }
 
         val fecha = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US).format(Date())
         val tmp = File(carpeta(ctx), "tmp_$fecha.pdf").apply { writeBytes(bytes) }
-        val datos = Lector.leerFactura(Lector.textoDePdf(ctx, tmp))
+        val datos = Lector.leerFactura(Lector.textoDePdf(ctx, tmp, hash))
 
         val etiqueta = (datos.numero ?: sugerido.orEmpty().substringBeforeLast(".").ifBlank { "comprobante" })
             .replace(Regex("[^A-Za-z0-9-]"), "").take(20)
@@ -98,47 +99,72 @@ object Descargas {
         return Guardado(destino, datos, false)
     }
 
+    /** Hilos para leer PDF en paralelo (la librería de PDF es lo más lento de la app). */
+    private val hilos = maxOf(1, minOf(3, Runtime.getRuntime().availableProcessors() - 1))
+
+    /** Lee varios PDF en paralelo. Devuelve (archivo, huella, datos) en el mismo orden. */
+    private fun leerEnParalelo(ctx: Context, archivos: List<File>, huellas: Map<File, String> = emptyMap()):
+        List<Triple<File, String, DatosLeidos>> {
+        if (archivos.isEmpty()) return emptyList()
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(minOf(hilos, archivos.size))
+        try {
+            return archivos.map { f ->
+                pool.submit<Triple<File, String, DatosLeidos>> {
+                    val h = huellas[f] ?: runCatching { Lector.huella(f) }.getOrDefault("")
+                    Triple(f, h, Lector.leerFactura(Lector.textoDePdf(ctx, f, h.ifBlank { null })))
+                }
+            }.map { it.get() }
+        } finally {
+            pool.shutdown()
+        }
+    }
+
     /** Lee y registra los PDF que todavía no figuran en el registro (p. ej. bajados con la v1.0). */
     fun reindexar(ctx: Context): Int {
         val conocidos = Suministros.todosLosComprobantes(ctx).map { it.archivo }.toSet()
-        var n = 0
-        for (f in archivos(ctx)) {
-            if (f.name in conocidos) continue
-            val clave = claveDeArchivo(f)
-            if (clave.isBlank()) continue
-            val d = Lector.leerFactura(Lector.textoDePdf(ctx, f))
-            val hash = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
-            Suministros.registrar(ctx, Comprobante(
-                clave, d.numero ?: "PDF ${f.name.split("_").getOrNull(3) ?: ""}", d.vencimiento, d.total,
+        val nuevos = archivos(ctx).filter { it.name !in conocidos && claveDeArchivo(it).isNotBlank() && !it.name.startsWith("tmp_") }
+        if (nuevos.isEmpty()) return 0
+        val leidos = leerEnParalelo(ctx, nuevos)
+        Suministros.lote(ctx) {
+            for ((f, hash, d) in leidos) Suministros.registrar(ctx, Comprobante(
+                claveDeArchivo(f), d.numero ?: "PDF ${f.name.split("_").getOrNull(3) ?: ""}", d.vencimiento, d.total,
                 d.consumoKwh, d.periodo, f.name, hash, "pdf", f.lastModified(),
                 if (d.factura != null) d.liquidacion.orEmpty() else "", d.conceptos
             ))
-            n++
         }
-        return n
+        return leidos.size
     }
 
     /**
-     * Vuelve a leer todos los PDF guardados (para sumar los conceptos a facturas bajadas
-     * con versiones anteriores) y une duplicados. Se ejecuta fuera del hilo principal.
+     * Vuelve a leer todos los PDF guardados (para aplicar reglas nuevas del lector) y une
+     * duplicados. Usa el texto ya extraído, así que es rápido aunque haya muchas facturas.
+     * Se ejecuta fuera del hilo principal.
      */
     fun actualizarRegistro(ctx: Context): Int {
         reindexar(ctx)
-        var n = 0
-        for (c in Suministros.todosLosComprobantes(ctx).filter { it.archivo.isNotBlank() }) {
-            val f = File(carpeta(ctx), c.archivo)
-            if (!f.exists()) continue
-            val d = Lector.leerFactura(Lector.textoDePdf(ctx, f))
-            Suministros.registrar(ctx, c.copy(
-                vencimiento = d.vencimiento.ifBlank { c.vencimiento }, total = d.total ?: c.total,
-                consumoKwh = d.consumoKwh ?: c.consumoKwh, periodo = d.periodo.ifBlank { c.periodo },
-                otroNumero = c.otroNumero.ifBlank { if (d.factura != null) d.liquidacion.orEmpty() else "" },
-                conceptos = d.conceptos
-            ))
-            n++
+        // restos de descargas interrumpidas
+        carpeta(ctx).listFiles { f -> f.name.startsWith("tmp_") && System.currentTimeMillis() - f.lastModified() > 3_600_000 }
+            ?.forEach { it.delete() }
+        val conArchivo = Suministros.todosLosComprobantes(ctx).filter { it.archivo.isNotBlank() }
+            .mapNotNull { c -> File(carpeta(ctx), c.archivo).takeIf { it.exists() }?.let { c to it } }
+        val huellas = conArchivo.filter { it.first.hash.isNotBlank() }.associate { it.second to it.first.hash }
+        val leidos = leerEnParalelo(ctx, conArchivo.map { it.second }, huellas)
+        Suministros.lote(ctx) {
+            conArchivo.zip(leidos).forEach { (par, l) ->
+                val c = par.first
+                val d = l.third
+                Suministros.registrar(ctx, c.copy(
+                    vencimiento = d.vencimiento.ifBlank { c.vencimiento }, total = d.total ?: c.total,
+                    consumoKwh = d.consumoKwh ?: c.consumoKwh, periodo = d.periodo.ifBlank { c.periodo },
+                    otroNumero = c.otroNumero.ifBlank { if (d.factura != null) d.liquidacion.orEmpty() else "" },
+                    hash = c.hash.ifBlank { l.second },
+                    conceptos = d.conceptos
+                ))
+            }
+            Suministros.depurar(ctx)
         }
-        Suministros.depurar(ctx)
-        return n
+        Lector.limpiarTextos(ctx, Suministros.todosLosComprobantes(ctx).map { it.hash }.filter { it.isNotBlank() }.toSet())
+        return leidos.size
     }
 
     /** Copia también a Descargas/EPEN para verlo con cualquier gestor de archivos. */

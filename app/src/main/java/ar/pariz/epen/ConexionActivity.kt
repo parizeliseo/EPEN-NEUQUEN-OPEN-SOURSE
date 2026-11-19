@@ -14,7 +14,6 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -22,13 +21,14 @@ import java.io.File
 import kotlin.concurrent.thread
 
 /** Ficha de una conexión: resumen del último año, última factura, accesos, historial y comprobantes. */
-class ConexionActivity : AppCompatActivity() {
+class ConexionActivity : Pantalla() {
 
     companion object { const val EXTRA_CLAVE = "clave" }
 
     private lateinit var clave: String
     private lateinit var cuerpo: LinearLayout
     private var verImporte = false
+    private var dosAnios = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -254,7 +254,7 @@ class ConexionActivity : AppCompatActivity() {
     private fun <T : View> T.tocable(accion: () -> Unit): T = apply {
         isClickable = true
         isFocusable = true
-        foreground = context.getDrawable(android.R.drawable.list_selector_background)
+        foreground = context.efectoToque()
         setOnClickListener { accion() }
     }
 
@@ -424,17 +424,31 @@ class ConexionActivity : AppCompatActivity() {
         }, 10)
     }
 
+    /** aaaammdd de hoy menos [anios] años, para filtrar por vencimiento. */
+    private fun haceAnios(anios: Int): Long = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+        .format(java.util.Calendar.getInstance().apply { add(java.util.Calendar.YEAR, -anios) }.time).toLong()
+
     private fun historial(comps: List<Comprobante>): View? {
-        val datos = comps.filter { it.orden > 0 }.sortedBy { it.orden }
-        val kwh = datos.filter { it.consumoKwh != null }.map { mesCorto(it.vencimiento) to it.consumoKwh!!.toDouble() }
-        val importes = datos.filter { it.total != null }.map { mesCorto(it.vencimiento) to it.total!! }
-        if (kwh.size < 2 && importes.size < 2) return null
-        if (kwh.size < 2) verImporte = true
+        val todas = comps.filter { it.orden > 0 }.sortedBy { it.orden }
+        val hayMasDeUnAnio = todas.any { it.orden <= haceAnios(1) }
+        if (!hayMasDeUnAnio) dosAnios = false
+        fun series(): Pair<List<Pair<String, Double>>, List<Pair<String, Double>>> {
+            val desde = haceAnios(if (dosAnios) 2 else 1)
+            val datos = if (hayMasDeUnAnio) todas.filter { it.orden > desde } else todas
+            return datos.filter { it.consumoKwh != null }.map { mesCorto(it.vencimiento) to it.consumoKwh!!.toDouble() } to
+                datos.filter { it.total != null }.map { mesCorto(it.vencimiento) to it.total!! }
+        }
+        val todasKwh = todas.count { it.consumoKwh != null }
+        val todasImp = todas.count { it.total != null }
+        if (todasKwh < 2 && todasImp < 2) return null
+        if (todasKwh < 2) verImporte = true
 
         val resumen = texto("", 13f, color = GRIS_TEXTO)
         val grafico = GraficoView(this)
         fun pintar() {
-            val serie = if (verImporte) importes else kwh
+            val (kwh, importes) = series()
+            val serie = (if (verImporte) importes else kwh).ifEmpty { if (verImporte) kwh else importes }
+            if (serie.isEmpty()) { resumen.text = "Sin datos en este período"; grafico.mostrar(emptyList()) { "" }; return }
             val fmt: (Double) -> String = if (verImporte) { v -> pesos(v) } else { v -> "${miles(v.toInt())} kWh" }
             grafico.mostrar(serie, fmt)
             val ult = serie.last().second
@@ -446,15 +460,25 @@ class ConexionActivity : AppCompatActivity() {
         val selector = MaterialButtonToggleGroup(this).apply {
             isSingleSelection = true
             isSelectionRequired = true
-            val b1 = boton("Consumo (kWh)", relleno = false) {}.apply { id = View.generateViewId(); isEnabled = kwh.size >= 2 }
-            val b2 = boton("Importe ($)", relleno = false) {}.apply { id = View.generateViewId(); isEnabled = importes.size >= 2 }
+            val b1 = boton("Consumo (kWh)", relleno = false) {}.apply { id = View.generateViewId(); isEnabled = todasKwh >= 2 }
+            val b2 = boton("Importe ($)", relleno = false) {}.apply { id = View.generateViewId(); isEnabled = todasImp >= 2 }
             addView(b1); addView(b2)
             check(if (verImporte) b2.id else b1.id)
             addOnButtonCheckedListener { _, id, marcado -> if (marcado) { verImporte = id == b2.id; pintar() } }
         }
+        val periodo = if (!hayMasDeUnAnio) null else MaterialButtonToggleGroup(this).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            val p1 = boton("1 año", relleno = false) {}.apply { id = View.generateViewId() }
+            val p2 = boton("2 años", relleno = false) {}.apply { id = View.generateViewId() }
+            addView(p1); addView(p2)
+            check(if (dosAnios) p2.id else p1.id)
+            addOnButtonCheckedListener { _, id, marcado -> if (marcado) { dosAnios = id == p2.id; pintar() } }
+        }
         pintar()
         return tarjeta(vertical(18).apply {
             addView(selector, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            periodo?.let { addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) }) }
             addView(resumen, lp(10))
             addView(grafico, lp(8))
             addView(fila().apply {
@@ -469,7 +493,7 @@ class ConexionActivity : AppCompatActivity() {
     private fun filaComprobante(s: Suministro, c: Comprobante): View = fila().apply {
         setPadding(dp(16), dp(12), dp(12), dp(12))
         isClickable = true
-        foreground = context.getDrawable(android.R.drawable.list_selector_background)
+        foreground = context.efectoToque()
         setOnClickListener { detalle(s, c) }
 
         addView(vertical().apply {

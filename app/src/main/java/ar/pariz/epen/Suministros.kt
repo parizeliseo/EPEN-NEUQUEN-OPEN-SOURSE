@@ -109,40 +109,94 @@ object Suministros {
         f.isEmpty() || Regex("""^\d{4,5}-\d{8}$""").matches(f.trim())
 
     // ---------- lectura / escritura ----------
-    private fun archivo(ctx: Context) = File(ctx.filesDir, ARCHIVO)
+    //
+    // El registro vive en memoria: se lee del disco una sola vez y cada cambio se guarda
+    // con escritura atómica (un corte de energía no deja el archivo a medias). Dentro de
+    // [lote] los cambios se acumulan y se escriben una sola vez al final.
 
-    private fun leer(ctx: Context): Pair<MutableList<Suministro>, MutableList<Comprobante>> = synchronized(lock) {
-        val f = archivo(ctx)
-        if (!f.exists()) migrarDesdePreferencias(ctx)
-        val o = try { JSONObject(f.readText()) } catch (e: Exception) { JSONObject() }
+    private var cacheS: List<Suministro>? = null
+    private var cacheC: List<Comprobante>? = null
+    private var porClave: Map<String, List<Comprobante>>? = null
+    private var enLote = 0
+    private var pendiente = false
+
+    private fun archivo(ctx: Context) = android.util.AtomicFile(File(ctx.filesDir, ARCHIVO))
+
+    private fun cargar(ctx: Context) {
+        if (cacheS != null) return
+        // AtomicFile puede dejar el contenido en .bak o .new si se cortó una escritura
+        val existe = listOf("", ".bak", ".new").any { File(ctx.filesDir, ARCHIVO + it).exists() }
+        if (!existe) { migrarDesdePreferencias(ctx); return }
+        val o = try { JSONObject(String(archivo(ctx).readFully(), Charsets.UTF_8)) } catch (e: Exception) { JSONObject() }
         val s = o.optJSONArray("suministros") ?: JSONArray()
         val c = o.optJSONArray("comprobantes") ?: JSONArray()
-        (0 until s.length()).map { Suministro.de(s.getJSONObject(it)) }.toMutableList() to
-            (0 until c.length()).map { Comprobante.de(c.getJSONObject(it)) }.toMutableList()
+        cacheS = (0 until s.length()).mapNotNull { runCatching { Suministro.de(s.getJSONObject(it)) }.getOrNull() }
+        cacheC = (0 until c.length()).mapNotNull { runCatching { Comprobante.de(c.getJSONObject(it)) }.getOrNull() }
+        porClave = null
+    }
+
+    /** Copias de trabajo: quien las recibe puede modificarlas sin tocar el registro. */
+    private fun leer(ctx: Context): Pair<MutableList<Suministro>, MutableList<Comprobante>> = synchronized(lock) {
+        cargar(ctx)
+        cacheS!!.toMutableList() to cacheC!!.toMutableList()
     }
 
     private fun escribir(ctx: Context, s: List<Suministro>, c: List<Comprobante>) = synchronized(lock) {
+        cacheS = s.toList()
+        cacheC = c.toList()
+        porClave = null
+        if (enLote > 0) pendiente = true else guardarEnDisco(ctx)
+    }
+
+    private fun guardarEnDisco(ctx: Context) {
         val o = JSONObject()
             .put("version", 2)
-            .put("suministros", JSONArray().apply { s.forEach { put(it.json()) } })
-            .put("comprobantes", JSONArray().apply { c.forEach { put(it.json()) } })
-        val tmp = File(ctx.filesDir, "$ARCHIVO.tmp")
-        tmp.writeText(o.toString())
-        tmp.renameTo(archivo(ctx))
+            .put("suministros", JSONArray().apply { cacheS.orEmpty().forEach { put(it.json()) } })
+            .put("comprobantes", JSONArray().apply { cacheC.orEmpty().forEach { put(it.json()) } })
+        val af = archivo(ctx)
+        val out = af.startWrite()
+        try {
+            out.write(o.toString().toByteArray(Charsets.UTF_8))
+            af.finishWrite(out)
+        } catch (e: Exception) {
+            af.failWrite(out)
+        }
+        pendiente = false
     }
+
+    /** Ejecuta varios cambios y los guarda en disco una sola vez. */
+    fun <T> lote(ctx: Context, bloque: () -> T): T {
+        synchronized(lock) { enLote++ }
+        try {
+            return bloque()
+        } finally {
+            synchronized(lock) {
+                enLote--
+                if (enLote == 0 && pendiente) guardarEnDisco(ctx)
+            }
+        }
+    }
+
+    /** Para pruebas: olvida lo que hay en memoria y vuelve a leer del disco. */
+    internal fun reiniciarCache() = synchronized(lock) { cacheS = null; cacheC = null; porClave = null }
 
     /** La versión 1.0 guardaba los suministros en SharedPreferences. */
     private fun migrarDesdePreferencias(ctx: Context) {
         val prefs = ctx.getSharedPreferences("epen", Context.MODE_PRIVATE)
         val viejo = try { JSONArray(prefs.getString("suministros", "[]")) } catch (e: Exception) { JSONArray() }
-        val lista = (0 until viejo.length()).map { Suministro.de(viejo.getJSONObject(it)) }
+        val lista = (0 until viejo.length()).mapNotNull { runCatching { Suministro.de(viejo.getJSONObject(it)) }.getOrNull() }
+        cacheS = emptyList(); cacheC = emptyList()
         escribir(ctx, lista, emptyList())
     }
 
     // ---------- conexiones ----------
-    fun listar(ctx: Context): List<Suministro> = leer(ctx).first.sortedBy { it.nombre.lowercase() }
+    fun listar(ctx: Context): List<Suministro> = synchronized(lock) {
+        cargar(ctx); cacheS!!.sortedBy { it.nombre.lowercase() }
+    }
 
-    fun buscar(ctx: Context, clave: String): Suministro? = leer(ctx).first.firstOrNull { it.clave == clave }
+    fun buscar(ctx: Context, clave: String): Suministro? = synchronized(lock) {
+        cargar(ctx); cacheS!!.firstOrNull { it.clave == clave }
+    }
 
     /** Guarda o reemplaza. Devuelve false si ya existe otra conexión con el mismo número. */
     fun guardar(ctx: Context, s: Suministro, claveAnterior: String? = null): Boolean = synchronized(lock) {
@@ -163,11 +217,16 @@ object Suministros {
     }
 
     // ---------- comprobantes ----------
-    fun comprobantes(ctx: Context, clave: String): List<Comprobante> =
-        leer(ctx).second.filter { it.clave == clave }
-            .sortedWith(compareByDescending<Comprobante> { it.orden }.thenByDescending { it.numero })
+    /** Comprobantes de una conexión, del más nuevo al más viejo (índice en memoria). */
+    fun comprobantes(ctx: Context, clave: String): List<Comprobante> = synchronized(lock) {
+        cargar(ctx)
+        val idx = porClave ?: cacheC!!.groupBy { it.clave }.mapValues { (_, l) ->
+            l.sortedWith(compareByDescending<Comprobante> { it.orden }.thenByDescending { it.numero })
+        }.also { porClave = it }
+        idx[clave].orEmpty()
+    }
 
-    fun todosLosComprobantes(ctx: Context): List<Comprobante> = leer(ctx).second
+    fun todosLosComprobantes(ctx: Context): List<Comprobante> = synchronized(lock) { cargar(ctx); cacheC!! }
 
     /** Agrega o completa un comprobante: nunca pisa datos conocidos con vacíos. */
     fun registrar(ctx: Context, nuevo: Comprobante) = synchronized(lock) {
@@ -226,8 +285,9 @@ object Suministros {
         unidos
     }
 
-    fun archivoConHash(ctx: Context, hash: String): String? =
-        leer(ctx).second.firstOrNull { it.hash == hash && it.archivo.isNotBlank() }?.archivo
+    fun archivoConHash(ctx: Context, hash: String): String? = synchronized(lock) {
+        cargar(ctx); cacheC!!.firstOrNull { it.hash == hash && it.archivo.isNotBlank() }?.archivo
+    }
 
     fun olvidarArchivo(ctx: Context, nombre: String) = synchronized(lock) {
         val (lista, comps) = leer(ctx)
@@ -245,7 +305,9 @@ object Suministros {
     }
 
     /** Une un respaldo con lo que ya hay. Devuelve (conexiones nuevas, comprobantes procesados). */
-    fun importar(ctx: Context, texto: String): Pair<Int, Int> = synchronized(lock) {
+    fun importar(ctx: Context, texto: String): Pair<Int, Int> = lote(ctx) { importarSinLote(ctx, texto) }
+
+    private fun importarSinLote(ctx: Context, texto: String): Pair<Int, Int> = synchronized(lock) {
         val o = JSONObject(texto)
         val (lista, _) = leer(ctx)
         var nuevas = 0

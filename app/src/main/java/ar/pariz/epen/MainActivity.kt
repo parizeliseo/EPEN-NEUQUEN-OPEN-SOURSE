@@ -13,7 +13,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import java.text.SimpleDateFormat
@@ -22,7 +21,7 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 /** Inicio: resumen general y todas las conexiones registradas. */
-class MainActivity : AppCompatActivity() {
+class MainActivity : Pantalla() {
 
     private lateinit var lista: LinearLayout
     private var leyendo = false

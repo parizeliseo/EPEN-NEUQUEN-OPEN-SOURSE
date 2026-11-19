@@ -149,11 +149,51 @@ object Lector {
         return out.values.toList()
     }
 
-    private var iniciado = false
+    @Volatile private var iniciado = false
 
-    /** Extrae el texto de un PDF. Devuelve "" si no se puede leer (PDF escaneado, dañado, etc.). */
-    fun textoDePdf(ctx: Context, f: File): String = try {
-        if (!iniciado) { PDFBoxResourceLoader.init(ctx.applicationContext); iniciado = true }
-        PDDocument.load(f).use { doc -> PDFTextStripper().apply { sortByPosition = true }.getText(doc) }
-    } catch (e: Throwable) { "" }
+    private fun iniciar(ctx: Context) {
+        if (iniciado) return
+        synchronized(this) {
+            if (!iniciado) { PDFBoxResourceLoader.init(ctx.applicationContext); iniciado = true }
+        }
+    }
+
+    /** Huella SHA-256 de un archivo, leída en bloques (no carga el archivo entero en memoria). */
+    fun huella(f: File): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        f.inputStream().buffered().use { ins ->
+            val buf = ByteArray(64 * 1024)
+            while (true) { val n = ins.read(buf); if (n <= 0) break; md.update(buf, 0, n) }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun carpetaTextos(ctx: Context) = File(ctx.filesDir, "textos").apply { mkdirs() }
+
+    /**
+     * Extrae el texto de un PDF. Devuelve "" si no se puede leer (PDF escaneado, dañado, etc.).
+     * El texto queda guardado por huella: volver a leer una factura ya procesada es instantáneo,
+     * aunque cambien las reglas del lector. [huellaConocida] evita recalcularla.
+     */
+    fun textoDePdf(ctx: Context, f: File, huellaConocida: String? = null): String {
+        val h = huellaConocida ?: runCatching { huella(f) }.getOrNull()
+        val cache = h?.let { File(carpetaTextos(ctx), "$it.txt") }
+        if (cache != null && cache.exists()) return runCatching { cache.readText() }.getOrDefault("")
+        val texto = try {
+            iniciar(ctx)
+            // hasta 16 MB en memoria; el resto, en archivos temporales (PDF grandes no agotan la RAM)
+            val memoria = com.tom_roush.pdfbox.io.MemoryUsageSetting.setupMixed(16L * 1024 * 1024)
+                .setTempDir(ctx.cacheDir)
+            PDDocument.load(f, memoria).use { doc ->
+                PDFTextStripper().apply { sortByPosition = true }.getText(doc)
+            }
+        } catch (e: Throwable) { "" }
+        if (cache != null && texto.isNotBlank()) runCatching { cache.writeText(texto) }
+        return texto
+    }
+
+    /** Borra textos guardados de PDF que ya no existen. */
+    fun limpiarTextos(ctx: Context, huellasVigentes: Set<String>) {
+        carpetaTextos(ctx).listFiles()?.forEach { if (it.nameWithoutExtension !in huellasVigentes) it.delete() }
+    }
 }

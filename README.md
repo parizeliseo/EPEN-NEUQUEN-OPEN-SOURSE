@@ -13,7 +13,7 @@ App Android **no oficial y de código abierto** para gestionar tus conexiones de
 - **Lectura de PDF**: extrae N° de factura y liquidación, vencimiento, total, kWh y período.
 - **Resumen del último año**: total facturado, kWh, impuestos y tasas, alumbrado público e intereses, por conexión y en total.
 - **Detalle por factura**: cada concepto del PDF agrupado por rubro.
-- **Historial**: gráfico interactivo de consumo o importe, con escala y promedio.
+- **Historial**: gráfico interactivo de consumo o importe, de 1 o 2 años, con escala y promedio.
 - **Desglose tocando cada cuadro**: por concepto y por factura.
 - **Aviso sonoro de vencimiento**: el día anterior y el día del vencimiento.
 - **Actualización automática**: relee los PDF en segundo plano y avisa de nuevas versiones publicadas en GitHub.
@@ -31,16 +31,29 @@ Sin servidores intermedios, sin cuentas, sin publicidad ni analíticas. Los dato
 
 ## Instalar
 
-Descargá `EPEN-al-dia-vX.Y.apk` desde **[Releases](../../releases/latest)** y habilitá "Instalar apps de origen desconocido". Requiere Android 8.0 o superior.
+Descargá `EPEN-al-dia-vX.Y.apk` desde **[Releases](../../releases/latest)** y habilitá "Instalar apps de origen desconocido". Requiere Android 8.0 o superior (compilada para Android 17).
 
 ## Compilar
 
 ```bash
-./gradlew testReleaseUnitTest   # pruebas del lector de facturas
+./gradlew testDebugUnitTest    # pruebas: lector, registro, capacidad y pantallas
 ./gradlew assembleRelease       # APK en app/build/outputs/apk/release/
 ```
 
 Cada push a `main` compila y prueba con GitHub Actions. Al publicar una etiqueta `vX.Y`, el APK se adjunta solo a la Release.
+
+## Rendimiento
+
+Medido con las pruebas automáticas (`RegistroTest`), 20 conexiones con 1000 facturas:
+
+| | v1.4 | v1.5 |
+|---|---|---|
+| Registrar 1000 facturas | 4,3 s | 0,13 s |
+| Armar la pantalla de inicio | 81 ms | 23 ms |
+
+Las pruebas `PantallasTest` abren cada pantalla y cada desglose con datos de ejemplo, y dejan capturas en `app/build/capturas` (también se publican como artefacto de cada compilación en GitHub Actions).
+
+Tecnología: Kotlin, Android Gradle Plugin 9.5, SDK 37, Material 1.14, WorkManager 2.12, PDFBox-Android, R8.
 
 ## Estructura
 
@@ -49,8 +62,9 @@ Cada push a `main` compila y prueba con GitHub Actions. Al publicar una etiqueta
 | `MainActivity.kt` | Lista de conexiones, respaldo y restauración |
 | `ConexionActivity.kt` | Ficha de la conexión: datos, resumen, gráficos y comprobantes |
 | `PortalActivity.kt` | Portal del EPEN en WebView, autocompletado, descarga individual y en lote |
-| `Suministros.kt` | Registro persistente de conexiones y comprobantes |
-| `Lector.kt` | Lectura de facturas (PDF) y de páginas de resultados |
+| `Suministros.kt` | Registro de conexiones y comprobantes: en memoria, con índice por conexión, lotes y escritura atómica |
+| `Lector.kt` | Lectura de facturas (PDF) con caché de texto, conceptos por rubro y páginas de resultados |
+| `Pantalla.kt` | Base de las pantallas: barra superior y bordes del sistema (borde a borde) |
 | `Avisos.kt` | Avisos de vencimiento, revisión en segundo plano y nuevas versiones |
 | `Descargas.kt` | Descarga, deduplicación por SHA-256 y archivo de PDF |
 | `ArchivoActivity.kt` | Mis facturas |
