@@ -4,6 +4,11 @@ plugins {
     id("com.android.application")
 }
 
+// Firma fija: todas las versiones tienen que firmarse con la misma clave para poder
+// instalarse encima de la anterior. En GitHub Actions la clave llega desde el secreto
+// FIRMA_KEYSTORE_B64 (ver .github/workflows/build.yml); si no está, se usa la clave debug local.
+val firmaFija = System.getenv("EPEN_FIRMA")?.let { file(it) }?.takeIf { it.exists() }
+
 android {
     namespace = "ar.pariz.epen"
     compileSdk = 37
@@ -16,14 +21,22 @@ android {
         versionName = "1.5"
     }
 
+    signingConfigs {
+        if (firmaFija != null) create("epen") {
+            storeFile = firmaFija
+            storePassword = System.getenv("EPEN_FIRMA_CLAVE") ?: "android"
+            keyAlias = System.getenv("EPEN_FIRMA_ALIAS") ?: "androiddebugkey"
+            keyPassword = System.getenv("EPEN_FIRMA_CLAVE") ?: "android"
+        }
+    }
+
     buildTypes {
         release {
             // R8 optimiza y achica el código de la app; las librerías de PDF quedan intactas
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Firmado con la clave debug para poder instalarlo directo desde GitHub.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("epen") ?: signingConfigs.getByName("debug")
         }
     }
     testOptions { unitTests.isIncludeAndroidResources = true }

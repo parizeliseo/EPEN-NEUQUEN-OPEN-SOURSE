@@ -19,6 +19,19 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Preparar la firma
+        id: firma
+        env:
+          FIRMA_B64: ${{ secrets.FIRMA_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$FIRMA_B64" ]; then
+            echo "$FIRMA_B64" | base64 -d > "$RUNNER_TEMP/epen.jks"
+            echo "EPEN_FIRMA=$RUNNER_TEMP/epen.jks" >> "$GITHUB_ENV"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Falta el secreto FIRMA_KEYSTORE_B64: el APK se firma con una clave temporal y NO se publica la Release (no se podría instalar encima de la versión anterior). Ver firma/LEEME.md."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Pruebas y compilación
         run: |
           chmod +x gradlew
@@ -37,6 +50,18 @@ jobs:
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/release/app-release.apk "EPEN-al-dia-v${VERSION}.apk"
+      - name: Verificar la huella de la firma
+        id: huella
+        if: steps.firma.outputs.ok == 'true'
+        run: |
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          REAL=$("$SIGNER" verify --print-certs EPEN-al-dia-v*.apk | grep -m1 'SHA-256 digest' | awk '{print $NF}')
+          ESPERADA=$(tr -d '[:space:]' < firma/HUELLA.txt)
+          echo "Huella del APK: $REAL"
+          if [ "$REAL" != "$ESPERADA" ]; then
+            echo "::error::La firma del APK ($REAL) no es la esperada ($ESPERADA). No se publica."
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: EPEN-al-dia-apk
@@ -51,7 +76,7 @@ jobs:
       # Cada versión nueva en main (versionName en app/build.gradle.kts) crea su Release
       # con el APK; también se puede publicar con una etiqueta vX.Y.
       - name: Publicar en la Release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        if: github.event_name == 'push' && steps.firma.outputs.ok == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}

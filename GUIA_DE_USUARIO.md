@@ -36,6 +36,7 @@ Anexo: [Avisos y actualización automática](#10-bis-avisos-y-actualización-aut
   - El registro se guarda de forma segura: si se corta la batería en el medio, no se pierde.
 - **Al día con Android 17.** La barra superior y los botones ya no quedan tapados por las barras del sistema ni por el teclado, en ninguna versión. En Android 8.0 se corrigió que los botones de navegación quedaban invisibles.
 - **APK más liviano:** pasó de 14,8 MB a 10 MB.
+- **Firma fija.** Todas las versiones nuevas se firman con la misma clave, así se instalan siempre encima sin perder datos. Si instalaste la 1.1–1.4 desde *Releases* de GitHub, esas tenían firmas distintas: guardá un respaldo (⋮ → Guardar respaldo de conexiones), desinstalá, instalá la 1.5 y restaurá el respaldo. Es una sola vez.
 - **Ícono temático:** en Android 13 o posterior, el ícono toma los colores de tu fondo de pantalla si activás los íconos temáticos.
 
 ---
@@ -327,6 +328,7 @@ Los PDF no van en el respaldo, porque ya están en `Descargas/EPEN`.
 | Impuestos, alumbrado o intereses en $ 0 | Esos rubros salen del PDF: bajá las facturas del año desde **Anteriores** (con **Bajar todo**) y, si siguen en cero, compartí el texto leído para ajustar la lectura. |
 | Una factura aparecía dos veces | Desde la 1.3 se unen solas; si quedara alguna, usá **⋮ → Volver a leer mis facturas**. |
 | Un importe o consumo quedó mal | Abrí el PDF original para confirmarlo y reportalo en *Issues*. |
+| "App no instalada" al actualizar | La versión que tenés se firmó con otra clave (pasa con la 1.1–1.4 bajadas de GitHub). Guardá un respaldo, desinstalá, instalá la nueva y restaurá el respaldo. Desde la 1.5 no vuelve a pasar. |
 | No se instala el APK | Revisá que esté habilitado "Instalar apps de origen desconocido" y que el teléfono tenga Android 8 o superior. |
 | El portal cambió y algo dejó de funcionar | Usá **⋮ → Abrir en el navegador** mientras tanto, y reportalo en *Issues*. |
 
